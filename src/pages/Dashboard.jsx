@@ -1,5 +1,4 @@
-import { useState, useMemo } from 'react';
-import { format } from 'date-fns';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, TrendingDown, PiggyBank, DollarSign, Landmark, Plus } from 'lucide-react';
 import {
@@ -9,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import MonthPicker from '@/components/ui/month-picker';
+import PeriodFilter, { usePeriodFilter } from '@/components/ui/period-filter';
 import useStore from '@/store/useStore';
 import { CATEGORIES } from '@/lib/constants';
 import {
@@ -22,10 +21,9 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 
 export default function Dashboard() {
   const { transactions, accounts } = useStore();
-  const [currentMonth, setCurrentMonth] = useState(format(new Date(), 'yyyy-MM'));
   const navigate = useNavigate();
-
-  const monthTx = useMemo(() => filterTransactionsByMonth(transactions, currentMonth), [transactions, currentMonth]);
+  const period = usePeriodFilter(transactions);
+  const { filtered: monthTx, currentMonth } = period;
   const totals = useMemo(() => calculateTotals(monthTx), [monthTx]);
 
   const categoryData = useMemo(() =>
@@ -69,7 +67,7 @@ export default function Dashboard() {
           <h2 className="text-2xl font-bold">Dashboard</h2>
           <p className="text-sm text-muted-foreground mt-0.5">Your financial overview at a glance</p>
         </div>
-        <div data-tour="month-picker"><MonthPicker value={currentMonth} onChange={setCurrentMonth} /></div>
+        <div data-tour="month-picker"><PeriodFilter {...period} /></div>
       </div>
 
       <div data-tour="stat-cards" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">

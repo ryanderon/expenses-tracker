@@ -14,10 +14,12 @@ import {
 import useStore from '@/store/useStore';
 import { CATEGORIES } from '@/lib/constants';
 import {
-  filterTransactionsByMonth, filterTransactionsByYear, calculateTotals,
-  formatCurrency, groupByCategory, groupBySubcategory, groupByAccount, getMonthsInYear,
+  filterTransactionsByMonth, filterTransactionsByYear, filterTransactionsByDateRange,
+  calculateTotals, formatCurrency, groupByCategory, groupBySubcategory, groupByAccount,
+  getMonthsInYear, getSalaryCycleRange,
 } from '@/lib/utils';
 import { exportToExcel } from '@/lib/excel';
+import DateRangePicker from '@/components/ui/date-range-picker';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -26,6 +28,7 @@ export default function Reports() {
   const [reportType, setReportType] = useState('monthly');
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
+  const [dateRange, setDateRange] = useState(getSalaryCycleRange());
 
   const years = useMemo(() => {
     const yrs = [...new Set(transactions.map((t) => new Date(t.date).getFullYear()))];
@@ -40,8 +43,11 @@ export default function Reports() {
   }));
 
   const activeTx = useMemo(
-    () => reportType === 'monthly' ? filterTransactionsByMonth(transactions, selectedMonth) : filterTransactionsByYear(transactions, parseInt(selectedYear)),
-    [transactions, reportType, selectedMonth, selectedYear]
+    () => {
+      if (reportType === 'range') return filterTransactionsByDateRange(transactions, dateRange?.from, dateRange?.to);
+      return reportType === 'monthly' ? filterTransactionsByMonth(transactions, selectedMonth) : filterTransactionsByYear(transactions, parseInt(selectedYear));
+    },
+    [transactions, reportType, selectedMonth, selectedYear, dateRange]
   );
 
   const totals = useMemo(() => calculateTotals(activeTx), [activeTx]);
@@ -58,7 +64,12 @@ export default function Reports() {
   }, [transactions, reportType, selectedYear]);
 
   const handleExport = () => {
-    const label = reportType === 'monthly' ? format(new Date(selectedMonth + '-01'), 'MMMM-yyyy') : selectedYear;
+    let label;
+    if (reportType === 'range' && dateRange?.from) {
+      label = `${format(dateRange.from, 'MMM-dd')}-to-${dateRange.to ? format(dateRange.to, 'MMM-dd-yyyy') : 'now'}`;
+    } else {
+      label = reportType === 'monthly' ? format(new Date(selectedMonth + '-01'), 'MMMM-yyyy') : selectedYear;
+    }
     exportToExcel(activeTx, accounts, `penny-report-${label}`);
   };
 
@@ -110,6 +121,7 @@ export default function Reports() {
               <TabsList>
                 <TabsTrigger value="monthly">Monthly</TabsTrigger>
                 <TabsTrigger value="yearly">Yearly</TabsTrigger>
+                <TabsTrigger value="range">Date Range</TabsTrigger>
               </TabsList>
             </Tabs>
             {reportType === 'monthly' ? (
@@ -117,11 +129,13 @@ export default function Reports() {
                 <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
                 <SelectContent>{monthOpts.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
               </Select>
-            ) : (
+            ) : reportType === 'yearly' ? (
               <Select value={selectedYear} onValueChange={setSelectedYear}>
                 <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
                 <SelectContent>{years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
               </Select>
+            ) : (
+              <DateRangePicker value={dateRange} onChange={setDateRange} />
             )}
           </div>
         </CardContent>
@@ -133,7 +147,13 @@ export default function Reports() {
             <Scale size={18} className="text-chart-1" />
             <CardTitle>Financial Summary</CardTitle>
             <Badge variant="outline">
-              {reportType === 'monthly' ? format(new Date(selectedMonth + '-01'), 'MMMM yyyy') : selectedYear}
+              {reportType === 'monthly'
+                ? format(new Date(selectedMonth + '-01'), 'MMMM yyyy')
+                : reportType === 'yearly'
+                  ? selectedYear
+                  : dateRange?.from
+                    ? `${format(dateRange.from, 'MMM d')}${dateRange.to ? ` – ${format(dateRange.to, 'MMM d, yyyy')}` : ''}`
+                    : 'Select range'}
             </Badge>
           </div>
         </CardHeader>

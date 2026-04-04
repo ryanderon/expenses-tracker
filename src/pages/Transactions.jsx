@@ -18,11 +18,11 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
-import MonthPicker from '@/components/ui/month-picker';
+import PeriodFilter, { usePeriodFilter } from '@/components/ui/period-filter';
 import CurrencyInput from '@/components/ui/currency-input';
 import useStore from '@/store/useStore';
 import { CATEGORIES, CATEGORY_LIST, getSubcategories } from '@/lib/constants';
-import { filterTransactionsByMonth, formatCurrency, formatDate, getAccountBalance, cn } from '@/lib/utils';
+import { formatCurrency, formatDate, cn } from '@/lib/utils';
 
 const INITIAL_FORM = {
   category: '', subcategory: '', account: '', toAccount: '', amount: '', date: format(new Date(), 'yyyy-MM-dd'), note: '',
@@ -343,16 +343,14 @@ function TransactionItem({ transaction, onEdit, onDelete }) {
 
 export default function Transactions() {
   const { transactions, addTransaction, updateTransaction, deleteTransaction } = useStore();
-  const [currentMonth, setCurrentMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const period = usePeriodFilter(transactions);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTx, setEditingTx] = useState(null);
 
-  const monthTx = useMemo(() => filterTransactionsByMonth(transactions, currentMonth), [transactions, currentMonth]);
-
   const filtered = useMemo(() => {
-    let list = monthTx;
+    let list = period.filtered;
     if (filterCategory !== 'all') list = list.filter((t) => t.category === filterCategory);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -362,7 +360,7 @@ export default function Transactions() {
       );
     }
     return list.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [monthTx, filterCategory, search]);
+  }, [period.filtered, filterCategory, search]);
 
   const handleSubmit = (data) => {
     if (editingTx) {
@@ -387,7 +385,7 @@ export default function Transactions() {
           <p className="text-sm text-muted-foreground mt-0.5">Manage your income and expenses</p>
         </div>
         <div className="flex items-center gap-3">
-          <MonthPicker value={currentMonth} onChange={setCurrentMonth} />
+          <PeriodFilter {...period} />
           <Button data-tour="add-transaction" onClick={openNew}><Plus size={16} /> Add</Button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { format, parse, startOfMonth, endOfMonth, eachMonthOfInterval, startOfYear, endOfYear } from 'date-fns';
+import { format, parse, startOfMonth, endOfMonth, eachMonthOfInterval, startOfYear, endOfYear, subMonths, startOfDay, endOfDay } from 'date-fns';
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -44,6 +44,31 @@ export function getMonthsInYear(year) {
 
 export function filterTransactionsByMonth(transactions, monthKey) {
   return transactions.filter((t) => getMonthKey(t.date) === monthKey);
+}
+
+export function filterTransactionsByDateRange(transactions, from, to) {
+  if (!from) return transactions;
+  const start = startOfDay(new Date(from));
+  const end = to ? endOfDay(new Date(to)) : endOfDay(new Date(from));
+  return transactions.filter((t) => {
+    const d = new Date(t.date);
+    return d >= start && d <= end;
+  });
+}
+
+export function getSalaryCycleRange(refDate = new Date()) {
+  const d = new Date(refDate);
+  const day = d.getDate();
+  let from, to;
+  if (day >= 25) {
+    from = new Date(d.getFullYear(), d.getMonth(), 25);
+    to = new Date(d.getFullYear(), d.getMonth() + 1, 24);
+  } else {
+    const prev = subMonths(d, 1);
+    from = new Date(prev.getFullYear(), prev.getMonth(), 25);
+    to = new Date(d.getFullYear(), d.getMonth(), 24);
+  }
+  return { from, to };
 }
 
 export function filterTransactionsByYear(transactions, year) {

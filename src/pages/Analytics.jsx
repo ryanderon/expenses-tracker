@@ -7,7 +7,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import MonthPicker from '@/components/ui/month-picker';
+import PeriodFilter, { usePeriodFilter } from '@/components/ui/period-filter';
 import useStore from '@/store/useStore';
 import { CATEGORIES } from '@/lib/constants';
 import {
@@ -20,13 +20,13 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 
 export default function Analytics() {
   const { transactions } = useStore();
-  const [currentMonth, setCurrentMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const period = usePeriodFilter(transactions);
   const [view, setView] = useState('monthly');
 
-  const year = parseInt(currentMonth.split('-')[0]);
+  const year = parseInt(period.currentMonth.split('-')[0]);
   const activeTx = useMemo(
-    () => view === 'monthly' ? filterTransactionsByMonth(transactions, currentMonth) : filterTransactionsByYear(transactions, year),
-    [transactions, currentMonth, year, view]
+    () => view === 'yearly' && period.mode === 'month' ? filterTransactionsByYear(transactions, year) : period.filtered,
+    [transactions, period.filtered, period.mode, year, view]
   );
   const totals = useMemo(() => calculateTotals(activeTx), [activeTx]);
 
@@ -86,14 +86,16 @@ export default function Analytics() {
           <h2 className="text-2xl font-bold">Analytics</h2>
           <p className="text-sm text-muted-foreground mt-0.5">Deep dive into your spending patterns</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Tabs value={view} onValueChange={setView}>
-            <TabsList>
-              <TabsTrigger value="monthly">Monthly</TabsTrigger>
-              <TabsTrigger value="yearly">Yearly</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <MonthPicker value={currentMonth} onChange={setCurrentMonth} />
+        <div className="flex items-center gap-3 flex-wrap">
+          {period.mode === 'month' && (
+            <Tabs value={view} onValueChange={setView}>
+              <TabsList>
+                <TabsTrigger value="monthly">Monthly</TabsTrigger>
+                <TabsTrigger value="yearly">Yearly</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
+          <PeriodFilter {...period} />
         </div>
       </div>
 
