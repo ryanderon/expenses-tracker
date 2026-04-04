@@ -62,15 +62,15 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Dashboard</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Your financial overview at a glance</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Dashboard</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Your financial overview at a glance</p>
         </div>
-        <div data-tour="month-picker"><PeriodFilter {...period} /></div>
+        <div data-tour="month-picker" className="self-start sm:self-auto"><PeriodFilter {...period} /></div>
       </div>
 
-      <div data-tour="stat-cards" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div data-tour="stat-cards" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
         {[
           { label: 'Income', value: totals.income, color: 'text-chart-1', icon: TrendingUp, bg: 'bg-chart-1/15' },
           { label: 'Expenses', value: totals.expenses, color: 'text-destructive', icon: TrendingDown, bg: 'bg-destructive/15' },
@@ -79,14 +79,14 @@ export default function Dashboard() {
           { label: 'Net Balance', value: totals.net, color: totals.net >= 0 ? 'text-chart-1' : 'text-destructive', icon: DollarSign, bg: 'bg-muted' },
         ].map(({ label, value, color, icon: Icon, bg }) => (
           <Card key={label} className={label === 'Net Balance' ? 'col-span-2 sm:col-span-1' : ''}>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
-                  <Icon size={16} className={color} />
+            <CardContent className="p-3 sm:pt-4 sm:pb-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl ${bg} flex items-center justify-center shrink-0`}>
+                  <Icon size={14} className={`${color} sm:[&]:size-[16px]`} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</p>
-                  <p className={`text-base sm:text-lg font-bold tabular-nums truncate ${color}`}>{formatCurrency(value)}</p>
+                  <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wider leading-tight">{label}</p>
+                  <p className={`text-sm sm:text-lg font-bold tabular-nums truncate ${color}`}>{formatCurrency(value)}</p>
                 </div>
               </div>
             </CardContent>
@@ -115,7 +115,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Allocation of Income</CardTitle></CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
               {[
                 { label: 'Expenses', val: totals.expenses, color: '#d47d52' },
                 { label: 'Savings', val: totals.savings, color: '#506180' },
@@ -124,15 +124,15 @@ export default function Dashboard() {
                 const p = Math.round((val / totals.income) * 100);
                 return (
                   <div key={label} className="text-center">
-                    <div className="relative w-16 h-16 mx-auto mb-2">
+                    <div className="relative w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-1.5 sm:mb-2">
                       <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
                         <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--secondary)" strokeWidth="3" />
                         <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={color} strokeWidth="3" strokeDasharray={`${p}, 100`} className="transition-all duration-700 ease-out" />
                       </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">{p}%</span>
+                      <span className="absolute inset-0 flex items-center justify-center text-[10px] sm:text-xs font-bold">{p}%</span>
                     </div>
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                    <p className="text-xs font-medium mt-0.5">{formatCurrency(val)}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">{label}</p>
+                    <p className="text-[10px] sm:text-xs font-medium mt-0.5">{formatCurrency(val)}</p>
                   </div>
                 );
               })}
@@ -147,7 +147,7 @@ export default function Dashboard() {
           <CardContent>
             {categoryData.length > 0 ? (
               <>
-                <ChartContainer config={pieConfig} className="mx-auto aspect-square max-h-[250px]">
+                <ChartContainer config={pieConfig} className="mx-auto aspect-square max-h-[200px] sm:max-h-[250px]">
                   <PieChart>
                     <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
                     <Pie data={categoryData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
@@ -198,8 +198,8 @@ export default function Dashboard() {
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">Monthly Trend ({year})</CardTitle></CardHeader>
-        <CardContent>
-          <ChartContainer config={areaConfig} className="h-[280px] w-full">
+        <CardContent className="px-2 sm:px-6">
+          <ChartContainer config={areaConfig} className="h-[220px] sm:h-[280px] w-full">
             <AreaChart data={trendData}>
               <defs>
                 <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
@@ -212,8 +212,8 @@ export default function Dashboard() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="month" tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} axisLine={false} />
-              <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} axisLine={false} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
+              <XAxis dataKey="month" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} axisLine={false} interval={0} />
+              <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} axisLine={false} tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(0)}M` : `${(v / 1e3).toFixed(0)}k`} width={40} />
               <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
               <Area type="monotone" dataKey="Income" stroke="#6b7d4a" fill="url(#incomeGrad)" strokeWidth={2} />
               <Area type="monotone" dataKey="Expenses" stroke="#d47d52" fill="url(#expenseGrad)" strokeWidth={2} />

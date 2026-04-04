@@ -379,28 +379,28 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Transactions</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage your income and expenses</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Transactions</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Manage your income and expenses</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <PeriodFilter {...period} />
-          <Button data-tour="add-transaction" onClick={openNew}><Plus size={16} /> Add</Button>
+          <Button data-tour="add-transaction" onClick={openNew} size="sm" className="shrink-0"><Plus size={14} /> <span className="hidden sm:inline">Add</span></Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <Card>
-          <CardContent className="pt-5">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Income</p>
-            <p className="text-xl font-bold text-chart-1">{formatCurrency(income)}</p>
+          <CardContent className="p-3 sm:pt-5">
+            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider mb-0.5 sm:mb-1">Income</p>
+            <p className="text-base sm:text-xl font-bold text-chart-1 truncate">{formatCurrency(income)}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-5">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Expenses</p>
-            <p className="text-xl font-bold text-destructive">{formatCurrency(expense)}</p>
+          <CardContent className="p-3 sm:pt-5">
+            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider mb-0.5 sm:mb-1">Expenses</p>
+            <p className="text-base sm:text-xl font-bold text-destructive truncate">{formatCurrency(expense)}</p>
           </CardContent>
         </Card>
       </div>

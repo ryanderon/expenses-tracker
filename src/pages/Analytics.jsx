@@ -81,17 +81,17 @@ export default function Analytics() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Analytics</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Deep dive into your spending patterns</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Analytics</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Deep dive into your spending patterns</p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {period.mode === 'month' && (
             <Tabs value={view} onValueChange={setView}>
               <TabsList>
-                <TabsTrigger value="monthly">Monthly</TabsTrigger>
-                <TabsTrigger value="yearly">Yearly</TabsTrigger>
+                <TabsTrigger value="monthly" className="text-xs sm:text-sm">Monthly</TabsTrigger>
+                <TabsTrigger value="yearly" className="text-xs sm:text-sm">Yearly</TabsTrigger>
               </TabsList>
             </Tabs>
           )}
@@ -99,7 +99,7 @@ export default function Analytics() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         {[
           { label: 'Income', val: totals.income, color: 'text-chart-1' },
           { label: 'Outflow', val: totals.expenses + totals.savings + totals.investments, color: 'text-destructive' },
@@ -107,9 +107,9 @@ export default function Analytics() {
           { label: 'Net', val: totals.net, color: totals.net >= 0 ? 'text-chart-1' : 'text-destructive' },
         ].map(({ label, val, color, isPct }) => (
           <Card key={label}>
-            <CardContent className="pt-5">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
-              <p className={`text-xl font-bold ${color}`}>{isPct ? `${val}%` : formatCurrency(val)}</p>
+            <CardContent className="p-3 sm:pt-5">
+              <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider mb-0.5 sm:mb-1">{label}</p>
+              <p className={`text-base sm:text-xl font-bold truncate ${color}`}>{isPct ? `${val}%` : formatCurrency(val)}</p>
             </CardContent>
           </Card>
         ))}
@@ -121,7 +121,7 @@ export default function Analytics() {
           <CardContent>
             {pieData.length > 0 ? (
               <>
-                <ChartContainer config={pieConfig} className="mx-auto aspect-square max-h-[250px]">
+                <ChartContainer config={pieConfig} className="mx-auto aspect-square max-h-[200px] sm:max-h-[250px]">
                   <PieChart>
                     <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
                     <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
@@ -148,11 +148,11 @@ export default function Analytics() {
           <CardHeader className="pb-2"><CardTitle className="text-sm">Expense Breakdown</CardTitle></CardHeader>
           <CardContent>
             {subData.length > 0 ? (
-              <ChartContainer config={subBarConfig} className="h-[280px] w-full">
-                <BarChart data={subData} layout="vertical" margin={{ left: 20 }}>
+              <ChartContainer config={subBarConfig} className="h-[250px] sm:h-[280px] w-full">
+                <BarChart data={subData} layout="vertical" margin={{ left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <YAxis dataKey="name" type="category" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} width={100} />
+                  <XAxis type="number" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <YAxis dataKey="name" type="category" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} width={80} />
                   <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
                   <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                     {subData.map((e, i) => <Cell key={i} fill={e.fill} />)}
@@ -168,11 +168,11 @@ export default function Analytics() {
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Monthly Comparison ({year})</CardTitle></CardHeader>
           <CardContent>
-            <ChartContainer config={barConfig} className="h-[280px] w-full">
+            <ChartContainer config={barConfig} className="h-[250px] sm:h-[280px] w-full">
               <BarChart data={monthlyComparison}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} />
-                <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
+                <XAxis dataKey="month" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} interval={0} />
+                <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(0)}M` : `${(v / 1e3).toFixed(0)}k`} width={40} />
                 <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
                 <Bar dataKey="Income" fill="#6b7d4a" radius={[2, 2, 0, 0]} />
                 <Bar dataKey="Bills" fill="#d47d52" radius={[2, 2, 0, 0]} />
@@ -187,7 +187,7 @@ export default function Analytics() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Spending Radar</CardTitle></CardHeader>
           <CardContent>
-            <ChartContainer config={radarConfig} className="mx-auto aspect-square max-h-[250px]">
+            <ChartContainer config={radarConfig} className="mx-auto aspect-square max-h-[200px] sm:max-h-[250px]">
               <RadarChart data={radarData}>
                 <PolarGrid stroke="var(--border)" />
                 <PolarAngleAxis dataKey="category" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} />

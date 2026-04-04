@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import * as React from 'react';
 import { format, subMonths, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { CalendarRange, Check } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
@@ -45,13 +46,13 @@ function useIsMobile() {
   const [isMobile, setIsMobile] = useState(
     typeof window !== 'undefined' ? window.innerWidth < 640 : false
   );
-  useState(() => {
-    if (typeof window === 'undefined') return;
+  React.useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
+    setIsMobile(mq.matches);
     const handler = (e) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
-  });
+  }, []);
   return isMobile;
 }
 

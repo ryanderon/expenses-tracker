@@ -39,9 +39,9 @@ export default function PeriodFilter({
   dateRange, setDateRange,
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 sm:gap-2">
       {/* Mode toggle */}
-      <div className="flex bg-secondary/60 rounded-lg p-0.5 border border-border">
+      <div className="flex bg-secondary/60 rounded-lg p-0.5 border border-border shrink-0">
         <button
           onClick={() => setMode('month')}
           className={`p-1.5 rounded-md transition-all cursor-pointer ${

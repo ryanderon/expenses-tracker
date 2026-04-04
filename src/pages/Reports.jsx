@@ -106,32 +106,32 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Reports</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Financial audit and summary reports</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Reports</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Financial audit and summary reports</p>
         </div>
-        <Button onClick={handleExport}><Download size={16} /> Export to Excel</Button>
+        <Button onClick={handleExport} size="sm"><Download size={14} /> Export</Button>
       </div>
 
       <Card>
-        <CardContent className="pt-5">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:pt-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
             <Tabs value={reportType} onValueChange={setReportType}>
               <TabsList>
-                <TabsTrigger value="monthly">Monthly</TabsTrigger>
-                <TabsTrigger value="yearly">Yearly</TabsTrigger>
-                <TabsTrigger value="range">Date Range</TabsTrigger>
+                <TabsTrigger value="monthly" className="text-xs sm:text-sm">Monthly</TabsTrigger>
+                <TabsTrigger value="yearly" className="text-xs sm:text-sm">Yearly</TabsTrigger>
+                <TabsTrigger value="range" className="text-xs sm:text-sm">Range</TabsTrigger>
               </TabsList>
             </Tabs>
             {reportType === 'monthly' ? (
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[200px]"><SelectValue /></SelectTrigger>
                 <SelectContent>{monthOpts.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
               </Select>
             ) : reportType === 'yearly' ? (
               <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[120px]"><SelectValue /></SelectTrigger>
                 <SelectContent>{years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
               </Select>
             ) : (

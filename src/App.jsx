@@ -165,29 +165,41 @@ function AppShell() {
     <div className="flex h-screen overflow-hidden">
       <DesktopSidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="flex items-center justify-between px-4 py-3 lg:px-6 border-b border-border bg-background/90 backdrop-blur-sm sticky top-0 z-30">
-          <div className="flex items-center gap-3">
+        <header className="flex items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 lg:px-6 border-b border-border bg-background/90 backdrop-blur-sm sticky top-0 z-30">
+          <div className="flex items-center gap-2 sm:gap-3">
             <MobileSidebar />
             <h1 className="hidden lg:block text-lg font-bold">{title}</h1>
           </div>
-          <div data-tour="header-actions" className="flex items-center gap-2">
+          <div data-tour="header-actions" className="flex items-center gap-1 sm:gap-2">
             <TourTrigger />
-            <Button variant="outline" size="sm" onClick={toggleTheme} className="gap-1.5">
+            <Button variant="outline" size="icon" className="h-8 w-8 sm:hidden" onClick={toggleTheme}>
               {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-              <span className="hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExportData}>
+            <Button variant="outline" size="sm" onClick={toggleTheme} className="gap-1.5 hidden sm:inline-flex">
+              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+              <span className="hidden md:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8 sm:hidden" onClick={handleExportData}>
               <HardDriveDownload size={14} />
-              <span className="hidden sm:inline">Backup</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+            <Button variant="outline" size="sm" onClick={handleExportData} className="hidden sm:inline-flex">
+              <HardDriveDownload size={14} />
+              <span className="hidden md:inline">Backup</span>
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8 sm:hidden" onClick={() => fileInputRef.current?.click()}>
               <Upload size={14} />
-              <span className="hidden sm:inline">Restore</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="hidden sm:inline-flex">
+              <Upload size={14} />
+              <span className="hidden md:inline">Restore</span>
             </Button>
             <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImportData} />
-            <Button variant="outline" size="sm" onClick={handleExport}>
+            <Button variant="outline" size="icon" className="h-8 w-8 sm:hidden" onClick={handleExport}>
               <Download size={14} />
-              <span className="hidden sm:inline">Export Excel</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExport} className="hidden sm:inline-flex">
+              <Download size={14} />
+              <span className="hidden md:inline">Export Excel</span>
             </Button>
           </div>
         </header>
