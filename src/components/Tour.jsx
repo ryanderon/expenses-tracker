@@ -284,11 +284,11 @@ export default function Tour() {
         >
           <div className="flex items-start justify-between gap-2 mb-2">
             <h3 className="text-sm font-bold flex items-center gap-1.5">
-              <Sparkles size={14} className="text-primary" />
+              <Sparkles className="text-primary size-3.5" />
               {currentStep.title}
             </h3>
             <button onClick={endTour} className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
-              <X size={14} />
+              <X className="size-3.5" />
             </button>
           </div>
 
@@ -317,7 +317,7 @@ export default function Tour() {
                   className="h-7 text-xs"
                   onClick={prev}
                 >
-                  <ChevronLeft size={12} />
+                  <ChevronLeft data-icon="inline-start" />
                   Back
                 </Button>
               )}
@@ -327,7 +327,7 @@ export default function Tour() {
                 onClick={next}
               >
                 {step === TOUR_STEPS.length - 1 ? 'Finish' : 'Next'}
-                {step < TOUR_STEPS.length - 1 && <ChevronRight size={12} />}
+                {step < TOUR_STEPS.length - 1 && <ChevronRight data-icon="inline-end" />}
               </Button>
             </div>
           </div>
@@ -338,7 +338,7 @@ export default function Tour() {
               <div
                 key={i}
                 className={cn(
-                  'w-1.5 h-1.5 rounded-full transition-colors',
+                  'size-1.5 rounded-full transition-colors',
                   i === step ? 'bg-primary' : i < step ? 'bg-primary/40' : 'bg-muted-foreground/20'
                 )}
               />
@@ -360,7 +360,7 @@ export function TourTrigger() {
 
   return (
     <Button variant="outline" size="sm" onClick={restartTour} className="gap-1.5">
-      <Sparkles size={14} />
+      <Sparkles data-icon="inline-start" />
       <span className="hidden sm:inline">Tour</span>
     </Button>
   );

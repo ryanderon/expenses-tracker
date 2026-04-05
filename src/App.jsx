@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router
 import { useState, useRef } from 'react';
 import {
   LayoutDashboard, ArrowLeftRight, PieChart, Target,
-  FileText, Menu, Download, Upload, HardDriveDownload, X, Wallet, Sun, Moon,
+  FileText, Menu, Download, Upload, HardDriveDownload, Wallet, Sun, Moon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -42,7 +42,7 @@ function SidebarNav({ onNavigate }) {
   const location = useLocation();
 
   return (
-    <nav className="flex-1 p-3 space-y-1">
+    <nav className="flex flex-col gap-1 flex-1 p-3">
       {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
         const isActive = location.pathname === to;
         return (
@@ -57,7 +57,7 @@ function SidebarNav({ onNavigate }) {
                 : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
             )}
           >
-            <Icon size={18} />
+            <Icon />
             {label}
           </NavLink>
         );
@@ -70,7 +70,7 @@ function DesktopSidebar() {
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-background">
       <div className="flex items-center gap-3 p-5">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+        <div className="size-9 rounded-xl bg-primary/10 flex items-center justify-center">
           <span className="text-sm font-bold text-primary">P</span>
         </div>
         <span className="text-lg font-bold tracking-tight font-serif">Penny</span>
@@ -78,7 +78,7 @@ function DesktopSidebar() {
       <Separator />
       <SidebarNav />
       <div className="mt-auto p-4">
-        <div className="rounded-lg bg-muted/50 px-3 py-2.5 text-center">
+        <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
           <p className="text-[11px] text-muted-foreground/70">made with ☕ by</p>
           <a href="https://github.com/ryanderon" target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">ryanderon</a>
         </div>
@@ -94,13 +94,13 @@ function MobileSidebar() {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="lg:hidden">
-          <Menu size={20} />
+          <Menu data-icon />
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-64 p-0">
         <SheetTitle className="sr-only">Navigation</SheetTitle>
         <div className="flex items-center gap-3 p-5">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <div className="size-9 rounded-xl bg-primary/10 flex items-center justify-center">
             <span className="text-sm font-bold text-primary">P</span>
           </div>
           <span className="text-lg font-bold tracking-tight font-serif">Penny</span>
@@ -108,7 +108,7 @@ function MobileSidebar() {
         <Separator />
         <SidebarNav onNavigate={() => setOpen(false)} />
         <div className="mt-auto p-4">
-          <div className="rounded-lg bg-muted/50 px-3 py-2.5 text-center">
+          <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
             <p className="text-[11px] text-muted-foreground/70">made with ☕ by</p>
             <a href="https://github.com/ryanderon" target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">ryanderon</a>
           </div>
@@ -165,40 +165,40 @@ function AppShell() {
     <div className="flex h-screen overflow-hidden">
       <DesktopSidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="flex items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 lg:px-6 border-b border-border bg-background/90 backdrop-blur-sm sticky top-0 z-30">
+        <header className="flex items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 lg:px-6 border-b border-border bg-background/90 backdrop-blur-sm sticky top-0">
           <div className="flex items-center gap-2 sm:gap-3">
             <MobileSidebar />
             <h1 className="hidden lg:block text-lg font-bold">{title}</h1>
           </div>
           <div data-tour="header-actions" className="flex items-center gap-1 sm:gap-2">
             <TourTrigger />
-            <Button variant="outline" size="icon" className="h-8 w-8 sm:hidden" onClick={toggleTheme}>
-              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            <Button variant="outline" size="icon" className="size-8 sm:hidden" onClick={toggleTheme}>
+              {theme === 'dark' ? <Sun data-icon /> : <Moon data-icon />}
             </Button>
             <Button variant="outline" size="sm" onClick={toggleTheme} className="gap-1.5 hidden sm:inline-flex">
-              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+              {theme === 'dark' ? <Sun data-icon="inline-start" /> : <Moon data-icon="inline-start" />}
               <span className="hidden md:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
             </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8 sm:hidden" onClick={handleExportData}>
-              <HardDriveDownload size={14} />
+            <Button variant="outline" size="icon" className="size-8 sm:hidden" onClick={handleExportData}>
+              <HardDriveDownload data-icon />
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportData} className="hidden sm:inline-flex">
-              <HardDriveDownload size={14} />
+              <HardDriveDownload data-icon="inline-start" />
               <span className="hidden md:inline">Backup</span>
             </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8 sm:hidden" onClick={() => fileInputRef.current?.click()}>
-              <Upload size={14} />
+            <Button variant="outline" size="icon" className="size-8 sm:hidden" onClick={() => fileInputRef.current?.click()}>
+              <Upload data-icon />
             </Button>
             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="hidden sm:inline-flex">
-              <Upload size={14} />
+              <Upload data-icon="inline-start" />
               <span className="hidden md:inline">Restore</span>
             </Button>
             <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImportData} />
-            <Button variant="outline" size="icon" className="h-8 w-8 sm:hidden" onClick={handleExport}>
-              <Download size={14} />
+            <Button variant="outline" size="icon" className="size-8 sm:hidden" onClick={handleExport}>
+              <Download data-icon />
             </Button>
             <Button variant="outline" size="sm" onClick={handleExport} className="hidden sm:inline-flex">
-              <Download size={14} />
+              <Download data-icon="inline-start" />
               <span className="hidden md:inline">Export Excel</span>
             </Button>
           </div>
@@ -226,7 +226,7 @@ function AppShell() {
 
 function MobileBottomNav() {
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border px-2 pb-[env(safe-area-inset-bottom)]">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t border-border px-2 pb-[env(safe-area-inset-bottom)]">
       <div className="flex justify-around">
         {NAV_ITEMS.slice(0, 5).map(({ to, label, icon: Icon }) => (
           <NavLink
@@ -239,7 +239,7 @@ function MobileBottomNav() {
               )
             }
           >
-            <Icon size={18} />
+            <Icon />
             <span className="text-[10px] mt-0.5 font-medium">{label}</span>
           </NavLink>
         ))}

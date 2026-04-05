@@ -12,12 +12,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Separator } from '@/components/ui/separator';
 import PeriodFilter, { usePeriodFilter } from '@/components/ui/period-filter';
 import CurrencyInput from '@/components/ui/currency-input';
 import useStore from '@/store/useStore';
@@ -32,7 +31,7 @@ function FieldError({ message }) {
   if (!message) return null;
   return (
     <p className="flex items-center gap-1 text-xs text-destructive mt-1">
-      <AlertCircle size={12} />
+      <AlertCircle className="size-3" />
       {message}
     </p>
   );
@@ -51,7 +50,6 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
 
   const subcategories = form.category ? getSubcategories(form.category, customSubcategories) : [];
   const selectedCat = CATEGORIES[form.category];
-  const selectedAccount = accounts.find((a) => a.id === form.account);
 
   const isTransfer = form.category === 'transfer';
   const isInvestment = form.category === 'investments';
@@ -118,10 +116,10 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col">
-          <div className="px-6 py-5 space-y-6">
+          <div className="flex flex-col gap-6 px-6 py-5">
             
             {/* Amount Hero Section */}
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label className={cn("text-xs uppercase tracking-wider text-muted-foreground font-semibold", errors.amount && touched.amount && 'text-destructive')}>
                 Amount
               </Label>
@@ -140,8 +138,8 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
               <FieldError message={touched.amount && errors.amount} />
             </div>
 
-            <div className="space-y-6">
-              <div className="space-y-2">
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-2">
                 <Label className={errors.category && touched.category ? 'text-destructive' : ''}>
                   Category
                 </Label>
@@ -150,21 +148,23 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectGroup>
                     {CATEGORY_LIST.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }} />
+                          <div className="size-2.5 rounded-full" style={{ backgroundColor: c.hex }} />
                           {c.label}
                         </div>
                       </SelectItem>
                     ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
                 <FieldError message={touched.category && errors.category} />
               </div>
 
               {!isTransfer && (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label className={errors.subcategory && touched.subcategory ? 'text-destructive' : ''}>
                     Subcategory
                   </Label>
@@ -173,9 +173,11 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
+                    <SelectGroup>
                       {subcategories.map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
+                    </SelectGroup>
                     </SelectContent>
                   </Select>
                   <FieldError message={touched.subcategory && errors.subcategory} />
@@ -183,8 +185,8 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
               )}
             </div>
 
-            <div className="space-y-6">
-              <div className="space-y-2">
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-2">
                 <Label className={errors.account && touched.account ? 'text-destructive' : ''}>
                   {showToAccount ? 'From Account' : 'Account'}
                 </Label>
@@ -193,21 +195,23 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectGroup>
                     {accounts.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: a.color }} />
+                          <div className="size-2.5 rounded-full" style={{ backgroundColor: a.color }} />
                           {a.name}
                         </div>
                       </SelectItem>
                     ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
                 <FieldError message={touched.account && errors.account} />
               </div>
 
               {showToAccount && (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label className={errors.toAccount && touched.toAccount ? 'text-destructive' : ''}>
                     To Account
                   </Label>
@@ -216,21 +220,23 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
                       <SelectValue placeholder="Select destination" />
                     </SelectTrigger>
                     <SelectContent>
-                      {accounts.filter((a) => a.id !== form.account).map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: a.color }} />
-                            {a.name}
-                          </div>
-                        </SelectItem>
-                      ))}
+                    <SelectGroup>
+                    {accounts.filter((a) => a.id !== form.account).map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        <div className="flex items-center gap-2">
+                          <div className="size-2.5 rounded-full" style={{ backgroundColor: a.color }} />
+                          {a.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                    </SelectGroup>
                     </SelectContent>
                   </Select>
                   <FieldError message={touched.toAccount && errors.toAccount} />
                 </div>
               )}
 
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label className={errors.date && touched.date ? 'text-destructive' : ''}>
                   Date
                 </Label>
@@ -244,7 +250,7 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Note <span className="text-muted-foreground font-normal opacity-70">(optional)</span></Label>
               <Input
                 value={form.note || ''}
@@ -273,16 +279,15 @@ function TransactionItem({ transaction, onEdit, onDelete }) {
   const toAccount = transaction.toAccount ? accounts.find((a) => a.id === transaction.toAccount) : null;
   const isIncome = transaction.category === 'income';
   const isTransfer = transaction.category === 'transfer';
-  const hasToAccount = !!toAccount;
   const cat = CATEGORIES[transaction.category];
 
   return (
     <div className="flex items-start sm:items-center gap-3 p-3 rounded-lg hover:bg-secondary/30 transition-colors group">
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0"
-        style={{ backgroundColor: `${cat?.color || '#666'}20`, color: cat?.color || '#666' }}
+        className="size-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0"
+        style={{ backgroundColor: `${cat?.hex || '#666'}20`, color: cat?.hex || '#666' }}
       >
-        {isTransfer ? <ArrowLeftRight size={18} /> : isIncome ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
+        {isTransfer ? <ArrowLeftRight /> : isIncome ? <ArrowDownLeft /> : <ArrowUpRight />}
       </div>
 
       <div className="flex-1 min-w-0">
@@ -314,23 +319,23 @@ function TransactionItem({ transaction, onEdit, onDelete }) {
       </div>
 
       <div className="flex flex-col items-end gap-2 shrink-0 ml-2">
-        <p className={`text-sm font-bold tabular-nums ${isTransfer ? 'text-muted-foreground' : isIncome ? 'text-chart-1' : 'text-destructive'}`}>
+        <p className={cn('text-sm font-bold tabular-nums', isTransfer ? 'text-muted-foreground' : isIncome ? 'text-chart-1' : 'text-destructive')}>
           {isTransfer ? '' : isIncome ? '+' : '-'}{formatCurrency(transaction.amount)}
         </p>
 
         <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(transaction)}>
-                <Pencil size={14} />
+              <Button variant="ghost" size="icon" className="size-7" onClick={() => onEdit(transaction)}>
+                <Pencil data-icon />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Edit</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => onDelete(transaction.id)}>
-                <Trash2 size={14} />
+              <Button variant="ghost" size="icon" className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => onDelete(transaction.id)}>
+                <Trash2 data-icon />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Delete</TooltipContent>
@@ -378,7 +383,7 @@ export default function Transactions() {
   const expense = filtered.filter((t) => t.category !== 'income' && t.category !== 'transfer').reduce((s, t) => s + t.amount, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold">Transactions</h2>
@@ -386,7 +391,7 @@ export default function Transactions() {
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <PeriodFilter {...period} />
-          <Button data-tour="add-transaction" onClick={openNew} size="sm" className="shrink-0"><Plus size={14} /> <span className="hidden sm:inline">Add</span></Button>
+          <Button data-tour="add-transaction" onClick={openNew} size="sm" className="shrink-0"><Plus data-icon="inline-start" /> <span className="hidden sm:inline">Add</span></Button>
         </div>
       </div>
 
@@ -407,7 +412,7 @@ export default function Transactions() {
 
       <div data-tour="search-filter" className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -418,10 +423,12 @@ export default function Transactions() {
         <Select value={filterCategory} onValueChange={setFilterCategory}>
           <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
+            <SelectGroup>
             <SelectItem value="all">All Categories</SelectItem>
             {CATEGORY_LIST.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
             ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
@@ -441,15 +448,15 @@ export default function Transactions() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
-                <ArrowUpRight size={28} className="text-muted-foreground" />
+              <div className="size-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
+                <ArrowUpRight className="text-muted-foreground" />
               </div>
               <h3 className="text-lg font-semibold mb-1">No transactions</h3>
               <p className="text-sm text-muted-foreground max-w-sm mb-4">
                 {search || filterCategory !== 'all' ? 'Try adjusting your filters' : 'Add your first transaction to get started'}
               </p>
               {!search && filterCategory === 'all' && (
-                <Button onClick={openNew}><Plus size={16} /> Add Transaction</Button>
+                <Button onClick={openNew}><Plus data-icon="inline-start" /> Add Transaction</Button>
               )}
             </div>
           )}

@@ -1,17 +1,20 @@
 export const CATEGORIES = {
   income: {
     label: 'Income',
-    color: '#6b7d4a',
+    color: 'var(--chart-1)',
+    hex: '#6b7d4a',
     subcategories: ['Freelance', 'Paycheck', 'Dividends', 'Other'],
   },
   bills: {
     label: 'Bills',
-    color: '#d47d52',
+    color: 'var(--chart-2)',
+    hex: '#d47d52',
     subcategories: ['Kos', 'Insurance', 'Subscriptions', 'Phones & Internet', 'Other'],
   },
   expenses: {
     label: 'Expenses',
-    color: '#bf6438',
+    color: 'var(--chart-5)',
+    hex: '#bf6438',
     subcategories: [
       'Groceries',
       'Transportation',
@@ -26,17 +29,20 @@ export const CATEGORIES = {
   },
   savings: {
     label: 'Savings',
-    color: '#506180',
+    color: 'var(--chart-3)',
+    hex: '#506180',
     subcategories: ['Emergency Fund', 'Goal Savings', 'General Savings', 'Other'],
   },
   investments: {
     label: 'Investments',
-    color: '#9070ad',
+    color: 'var(--chart-4)',
+    hex: '#9070ad',
     subcategories: ['Reksa Dana', 'Stock', 'Cryptocurrency', 'Other'],
   },
   transfer: {
     label: 'Transfer',
-    color: '#9c8c74',
+    color: 'var(--muted-foreground)',
+    hex: '#9c8c74',
     subcategories: ['Account Transfer'],
   },
 };
