@@ -40,7 +40,7 @@ import { exportToExcel } from "@/lib/excel";
 import { cn } from "@/lib/utils";
 import Tour, { TourTrigger } from "@/components/Tour";
 import useTheme from "@/hooks/useTheme";
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/next";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -362,7 +362,7 @@ function MobileBottomNav() {
 export default function App() {
   return (
     <>
-      <Analytics />
+      <VercelAnalytics />
       <BrowserRouter>
         <TooltipProvider>
           <AppShell />
