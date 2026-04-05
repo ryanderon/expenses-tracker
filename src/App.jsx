@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/sheet";
 import Dashboard from "@/pages/Dashboard";
 import Transactions from "@/pages/Transactions";
-import Analytics from "@/pages/Analytics";
+import AnalyticsPage from "@/pages/Analytics";
 import Budget from "@/pages/Budget";
 import Reports from "@/pages/Reports";
 import Accounts from "@/pages/Accounts";
@@ -40,7 +40,7 @@ import { exportToExcel } from "@/lib/excel";
 import { cn } from "@/lib/utils";
 import Tour, { TourTrigger } from "@/components/Tour";
 import useTheme from "@/hooks/useTheme";
-import { Analytics as VercelAnalytics } from "@vercel/analytics/next";
+import { Analytics  } from "@vercel/analytics/react";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -318,7 +318,7 @@ function AppShell() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/transactions" element={<Transactions />} />
-              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/budget" element={<Budget />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/accounts" element={<Accounts />} />
@@ -362,7 +362,7 @@ function MobileBottomNav() {
 export default function App() {
   return (
     <>
-      <VercelAnalytics />
+      <Analytics />
       <BrowserRouter>
         <TooltipProvider>
           <AppShell />
