@@ -4,6 +4,7 @@ import { Calendar, CalendarRange } from 'lucide-react';
 import MonthPicker from '@/components/ui/month-picker';
 import DateRangePicker from '@/components/ui/date-range-picker';
 import { filterTransactionsByMonth, filterTransactionsByDateRange, getSalaryCycleRange } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 export function usePeriodFilter(transactions) {
   const [mode, setMode] = useState('month');
@@ -44,21 +45,23 @@ export default function PeriodFilter({
       <div className="flex bg-secondary/60 rounded-lg p-0.5 border border-border shrink-0">
         <button
           onClick={() => setMode('month')}
-          className={`p-1.5 rounded-md transition-all cursor-pointer ${
+          className={cn(
+            'p-1.5 rounded-md transition-all cursor-pointer',
             mode === 'month' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-          }`}
+          )}
           title="Filter by month"
         >
-          <Calendar size={14} />
+          <Calendar />
         </button>
         <button
           onClick={() => setMode('range')}
-          className={`p-1.5 rounded-md transition-all cursor-pointer ${
+          className={cn(
+            'p-1.5 rounded-md transition-all cursor-pointer',
             mode === 'range' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-          }`}
+          )}
           title="Filter by date range"
         >
-          <CalendarRange size={14} />
+          <CalendarRange />
         </button>
       </div>
 

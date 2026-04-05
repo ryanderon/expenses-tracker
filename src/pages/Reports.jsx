@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter,
@@ -19,6 +19,7 @@ import {
   getMonthsInYear, getSalaryCycleRange,
 } from '@/lib/utils';
 import { exportToExcel } from '@/lib/excel';
+import { cn } from '@/lib/utils';
 import DateRangePicker from '@/components/ui/date-range-picker';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -80,7 +81,7 @@ export default function Reports() {
     return (
       <div key={catKey} className="border-b border-border/50">
         <div className="bg-secondary/30 px-4 py-2.5">
-          <span className={`text-xs font-bold uppercase tracking-wider ${titleColor}`}>
+          <span className={cn('text-xs font-bold uppercase tracking-wider', titleColor)}>
             {CATEGORIES[catKey].label}
           </span>
         </div>
@@ -93,8 +94,8 @@ export default function Reports() {
               </div>
             ))}
             <div className="flex justify-between px-4 py-2.5 bg-secondary/20 font-semibold">
-              <span className={`text-sm ${titleColor}`}>Total {CATEGORIES[catKey].label}</span>
-              <span className={`text-sm tabular-nums ${titleColor}`}>{formatCurrency(catTotal)}</span>
+              <span className={cn('text-sm', titleColor)}>Total {CATEGORIES[catKey].label}</span>
+              <span className={cn('text-sm tabular-nums', titleColor)}>{formatCurrency(catTotal)}</span>
             </div>
           </>
         ) : (
@@ -105,13 +106,13 @@ export default function Reports() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold">Reports</h2>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Financial audit and summary reports</p>
         </div>
-        <Button onClick={handleExport} size="sm"><Download size={14} /> Export</Button>
+        <Button onClick={handleExport} size="sm"><Download data-icon="inline-start" /> Export</Button>
       </div>
 
       <Card>
@@ -127,12 +128,12 @@ export default function Reports() {
             {reportType === 'monthly' ? (
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                 <SelectTrigger className="w-full sm:w-[200px]"><SelectValue /></SelectTrigger>
-                <SelectContent>{monthOpts.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                <SelectContent><SelectGroup>{monthOpts.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
             ) : reportType === 'yearly' ? (
               <Select value={selectedYear} onValueChange={setSelectedYear}>
                 <SelectTrigger className="w-full sm:w-[120px]"><SelectValue /></SelectTrigger>
-                <SelectContent>{years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                <SelectContent><SelectGroup>{years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
             ) : (
               <DateRangePicker value={dateRange} onChange={setDateRange} />
@@ -144,7 +145,7 @@ export default function Reports() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Scale size={18} className="text-chart-1" />
+            <Scale className="text-chart-1" />
             <CardTitle>Financial Summary</CardTitle>
             <Badge variant="outline">
               {reportType === 'monthly'
@@ -168,10 +169,10 @@ export default function Reports() {
             <div className="bg-secondary/40 px-4 py-4">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  {totals.net >= 0 ? <TrendingUp size={18} className="text-chart-1" /> : <TrendingDown size={18} className="text-destructive" />}
+                  {totals.net >= 0 ? <TrendingUp className="text-chart-1" /> : <TrendingDown className="text-destructive" />}
                   <span className="font-bold">Net Result</span>
                 </div>
-                <span className={`text-lg font-bold tabular-nums ${totals.net >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                <span className={cn('text-lg font-bold tabular-nums', totals.net >= 0 ? 'text-chart-1' : 'text-destructive')}>
                   {formatCurrency(totals.net)}
                 </span>
               </div>
@@ -183,7 +184,7 @@ export default function Reports() {
       <Card>
         <CardHeader><CardTitle className="text-sm">Account Usage</CardTitle></CardHeader>
         <CardContent>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {accounts.map((acc) => {
               const accTx = accGroups[acc.id] || { items: [], total: 0 };
               const accIncome = (accTx.items || []).filter((t) => t.category === 'income').reduce((s, t) => s + t.amount, 0);
@@ -191,7 +192,7 @@ export default function Reports() {
               return (
                 <div key={acc.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ backgroundColor: `${acc.color}25`, color: acc.color }}>
+                    <div className="size-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ backgroundColor: `${acc.color}25`, color: acc.color }}>
                       {acc.name.charAt(0)}
                     </div>
                     <div>
@@ -232,7 +233,7 @@ export default function Reports() {
                       <TableCell className="text-right text-chart-1 tabular-nums">{formatCurrency(row.income)}</TableCell>
                       <TableCell className="text-right text-destructive tabular-nums">{formatCurrency(row.expenses)}</TableCell>
                       <TableCell className="text-right text-chart-3 tabular-nums">{formatCurrency(row.savings)}</TableCell>
-                      <TableCell className={`text-right font-semibold tabular-nums ${row.net >= 0 ? 'text-chart-1' : 'text-destructive'}`}>{formatCurrency(row.net)}</TableCell>
+                      <TableCell className={cn('text-right font-semibold tabular-nums', row.net >= 0 ? 'text-chart-1' : 'text-destructive')}>{formatCurrency(row.net)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -242,7 +243,7 @@ export default function Reports() {
                     <TableCell className="text-right text-chart-1 tabular-nums font-bold">{formatCurrency(totals.income)}</TableCell>
                     <TableCell className="text-right text-destructive tabular-nums font-bold">{formatCurrency(totals.expenses)}</TableCell>
                     <TableCell className="text-right text-chart-3 tabular-nums font-bold">{formatCurrency(totals.savings)}</TableCell>
-                    <TableCell className={`text-right tabular-nums font-bold ${totals.net >= 0 ? 'text-chart-1' : 'text-destructive'}`}>{formatCurrency(totals.net)}</TableCell>
+                    <TableCell className={cn('text-right tabular-nums font-bold', totals.net >= 0 ? 'text-chart-1' : 'text-destructive')}>{formatCurrency(totals.net)}</TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>

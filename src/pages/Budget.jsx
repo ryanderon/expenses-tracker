@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -23,7 +23,7 @@ import CurrencyInput from '@/components/ui/currency-input';
 import MonthPicker from '@/components/ui/month-picker';
 import useStore from '@/store/useStore';
 import { CATEGORIES } from '@/lib/constants';
-import { filterTransactionsByMonth, formatCurrency } from '@/lib/utils';
+import { filterTransactionsByMonth, formatCurrency, cn } from '@/lib/utils';
 
 export default function Budget() {
   const {
@@ -120,7 +120,7 @@ export default function Budget() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Budget</h2>
@@ -138,7 +138,7 @@ export default function Budget() {
               size="sm"
               onClick={() => setRolloverEnabled(!rolloverEnabled)}
             >
-              <RotateCcw size={14} className="mr-1.5" />
+              <RotateCcw data-icon="inline-start" />
               Rollover {rolloverEnabled ? 'On' : 'Off'}
             </Button>
           </TooltipTrigger>
@@ -149,7 +149,7 @@ export default function Budget() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="outline" size="sm" onClick={() => copyBudgetFromMonth(prevMonthKey, currentMonth)}>
-                <Copy size={14} className="mr-1.5" /> Copy Last Month
+                <Copy data-icon="inline-start" /> Copy Last Month
               </Button>
             </TooltipTrigger>
             <TooltipContent>Copy budget allocations from {prevMonthLabel}</TooltipContent>
@@ -159,14 +159,14 @@ export default function Budget() {
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="outline" size="sm" onClick={() => prefillBudgetFromSpending(prevMonthKey, currentMonth)}>
-              <Receipt size={14} className="mr-1.5" /> Use Last Month's Actuals
+              <Receipt data-icon="inline-start" /> Use Last Month's Actuals
             </Button>
           </TooltipTrigger>
           <TooltipContent>Set budget based on actual spending from {prevMonthLabel}</TooltipContent>
         </Tooltip>
 
         <Button variant="outline" size="sm" onClick={() => setShowCategoryManager(true)}>
-          <Tags size={14} className="mr-1.5" /> Manage Categories
+          <Tags data-icon="inline-start" /> Manage Categories
         </Button>
       </div>
 
@@ -175,7 +175,7 @@ export default function Budget() {
         <Card className="border-dashed border-chart-1/50 bg-chart-1/5">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2">
-              <RotateCcw size={16} className="text-chart-1" />
+              <RotateCcw className="text-chart-1 size-4" />
               <p className="text-sm">
                 <span className="font-medium text-chart-1">{formatCurrency(totalRollover)}</span>
                 {' '}rolled over from {prevMonthLabel}
@@ -194,8 +194,8 @@ export default function Budget() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Income</p>
                 <p className="text-xl font-bold tabular-nums text-chart-1">{formatCurrency(income)}</p>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-chart-1/15 flex items-center justify-center">
-                <TrendingUp size={18} className="text-chart-1" />
+              <div className="size-9 rounded-xl bg-chart-1/15 flex items-center justify-center">
+                <TrendingUp className="text-chart-1" />
               </div>
             </div>
           </CardContent>
@@ -207,8 +207,8 @@ export default function Budget() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Budget</p>
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(totalBudget)}</p>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
-                <Target size={18} className="text-muted-foreground" />
+              <div className="size-9 rounded-xl bg-muted flex items-center justify-center">
+                <Target className="text-muted-foreground" />
               </div>
             </div>
             <div className="flex flex-col gap-0.5 mt-1">
@@ -224,10 +224,10 @@ export default function Budget() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Spent</p>
-                <p className={`text-xl font-bold tabular-nums ${totalSpent > totalBudget && totalBudget > 0 ? 'text-destructive' : ''}`}>{formatCurrency(totalSpent)}</p>
+                <p className={cn('text-xl font-bold tabular-nums', totalSpent > totalBudget && totalBudget > 0 && 'text-destructive')}>{formatCurrency(totalSpent)}</p>
               </div>
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${totalSpent > totalBudget && totalBudget > 0 ? 'bg-destructive/15' : 'bg-muted'}`}>
-                <TrendingDown size={18} className={totalSpent > totalBudget && totalBudget > 0 ? 'text-destructive' : 'text-muted-foreground'} />
+              <div className={cn('size-9 rounded-xl flex items-center justify-center', totalSpent > totalBudget && totalBudget > 0 ? 'bg-destructive/15' : 'bg-muted')}>
+                <TrendingDown className={totalSpent > totalBudget && totalBudget > 0 ? 'text-destructive' : 'text-muted-foreground'} />
               </div>
             </div>
           </CardContent>
@@ -237,13 +237,13 @@ export default function Budget() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Unallocated</p>
-                <p className={`text-xl font-bold tabular-nums ${unallocated < 0 ? 'text-destructive' : 'text-chart-1'}`}>{formatCurrency(unallocated)}</p>
+                <p className={cn('text-xl font-bold tabular-nums', unallocated < 0 ? 'text-destructive' : 'text-chart-1')}>{formatCurrency(unallocated)}</p>
               </div>
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${unallocated < 0 ? 'bg-destructive/15' : 'bg-chart-1/15'}`}>
-                <Wallet size={18} className={unallocated < 0 ? 'text-destructive' : 'text-chart-1'} />
+              <div className={cn('size-9 rounded-xl flex items-center justify-center', unallocated < 0 ? 'bg-destructive/15' : 'bg-chart-1/15')}>
+                <Wallet className={unallocated < 0 ? 'text-destructive' : 'text-chart-1'} />
               </div>
             </div>
-            {unallocated < 0 && <p className="text-xs text-destructive mt-1 flex items-center gap-1"><AlertTriangle size={10} /> Over-allocated</p>}
+            {unallocated < 0 && <p className="text-xs text-destructive mt-1 flex items-center gap-1"><AlertTriangle className="size-2.5" /> Over-allocated</p>}
           </CardContent>
         </Card>
       </div>
@@ -254,7 +254,7 @@ export default function Budget() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Target size={18} className="text-chart-1" />
+                <Target className="text-chart-1" />
                 <h3 className="text-sm font-semibold">Total Budget Usage</h3>
               </div>
               <p className="text-2xl font-bold">
@@ -262,8 +262,8 @@ export default function Budget() {
                 <span className="text-sm font-normal text-muted-foreground">of {formatCurrency(totalBudget)}</span>
               </p>
             </div>
-            <div className="text-right">
-              <p className={`text-3xl font-bold ${totalSpent > totalBudget && totalBudget > 0 ? 'text-destructive' : 'text-chart-1'}`}>
+            <div className={cn('text-right', 'shrink-0')}>
+              <p className={cn('text-3xl font-bold', totalSpent > totalBudget && totalBudget > 0 ? 'text-destructive' : 'text-chart-1')}>
                 {totalPct}%
               </p>
               <p className="text-xs text-muted-foreground">used</p>
@@ -281,7 +281,7 @@ export default function Budget() {
               <CardContent className="pt-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                    <div className="size-3 rounded-full" style={{ backgroundColor: cat.hex }} />
                     <h4 className="text-sm font-semibold">{cat.label}</h4>
                   </div>
                   {cat.isOver && <span className="text-xs text-destructive font-medium">Over budget!</span>}
@@ -297,7 +297,7 @@ export default function Budget() {
                 </div>
 
                 <div className="h-2 rounded-full overflow-hidden mb-3">
-                  <Progress value={cat.pct} className="h-2" style={{ '--progress-color': cat.isOver ? 'var(--destructive)' : cat.color }} />
+                  <Progress value={cat.pct} className="h-2" style={{ '--progress-color': cat.isOver ? 'var(--destructive)' : cat.hex }} />
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -310,14 +310,14 @@ export default function Budget() {
                   />
                   {isEditing && (
                     <Button size="sm" className="h-8" onClick={() => handleSave(cat.key)}>
-                      <Save size={14} /> Save
+                      <Save data-icon="inline-start" /> Save
                     </Button>
                   )}
                 </div>
 
                 {cat.rollover > 0 && (
                   <p className="text-xs text-chart-1 mt-2 flex items-center gap-1">
-                    <RotateCcw size={10} />
+                    <RotateCcw className="size-2.5" />
                     +{formatCurrency(cat.rollover)} rollover
                     <span className="text-muted-foreground">
                       (effective: {formatCurrency(cat.effectiveBudget)})
@@ -326,13 +326,13 @@ export default function Budget() {
                 )}
 
                 {cat.effectiveBudget > 0 && cat.rollover === 0 && (
-                  <p className={`text-xs mt-2 ${cat.isOver ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  <p className={cn('text-xs mt-2', cat.isOver ? 'text-destructive' : 'text-muted-foreground')}>
                     {cat.isOver ? `${formatCurrency(cat.spent - cat.effectiveBudget)} over budget` : `${formatCurrency(cat.remaining)} remaining`}
                   </p>
                 )}
 
                 {cat.effectiveBudget > 0 && cat.rollover > 0 && (
-                  <p className={`text-xs mt-1 ${cat.isOver ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  <p className={cn('text-xs mt-1', cat.isOver ? 'text-destructive' : 'text-muted-foreground')}>
                     {cat.isOver ? `${formatCurrency(cat.spent - cat.effectiveBudget)} over budget` : `${formatCurrency(cat.remaining)} remaining`}
                   </p>
                 )}
@@ -350,18 +350,20 @@ export default function Budget() {
             <DialogDescription>Add or remove custom subcategories for any category</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             <div className="flex gap-2">
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectGroup>
                   {Object.entries(CATEGORIES)
                     .filter(([key]) => key !== 'transfer')
                     .map(([key, cat]) => (
                       <SelectItem key={key} value={key}>{cat.label}</SelectItem>
                     ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               <Input
@@ -372,24 +374,24 @@ export default function Budget() {
                 className="flex-1"
               />
               <Button size="sm" onClick={handleAddSubcategory} disabled={!selectedCategory || !newSubcategory.trim()}>
-                <Plus size={14} />
+                <Plus data-icon />
               </Button>
             </div>
 
             {allCustom.length > 0 ? (
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label className="text-xs text-muted-foreground">Custom subcategories</Label>
                 <div className="flex flex-wrap gap-2">
                   {allCustom.map((item) => (
                     <Badge key={`${item.category}-${item.name}`} variant="secondary" className="gap-1 pr-1">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORIES[item.category]?.color }} />
+                      <span className="size-2 rounded-full" style={{ backgroundColor: CATEGORIES[item.category]?.hex }} />
                       {item.name}
                       <span className="text-muted-foreground text-[10px]">({item.label})</span>
                       <button
                         onClick={() => removeCustomSubcategory(item.category, item.name)}
                         className="ml-1 hover:text-destructive rounded-sm p-0.5"
                       >
-                        <X size={12} />
+                        <X className="size-3" />
                       </button>
                     </Badge>
                   ))}

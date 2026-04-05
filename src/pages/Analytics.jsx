@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { format } from 'date-fns';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -12,10 +11,9 @@ import useStore from '@/store/useStore';
 import { CATEGORIES } from '@/lib/constants';
 import {
   filterTransactionsByMonth, filterTransactionsByYear, calculateTotals,
-  formatCurrency, groupBySubcategory, getMonthsInYear,
+  formatCurrency, groupBySubcategory, getMonthsInYear, cn,
 } from '@/lib/utils';
 
-const CHART_COLORS = ['#6b7d4a', '#d47d52', '#bf6438', '#506180', '#9070ad', '#9c8c74', '#8a9f62'];
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function Analytics() {
@@ -36,16 +34,17 @@ export default function Analytics() {
       .map(([key, cat]) => ({
         name: cat.label,
         value: activeTx.filter((t) => t.category === key).reduce((s, t) => s + t.amount, 0),
-        fill: cat.color,
+        fill: cat.hex,
       }))
       .filter((d) => d.value > 0),
   [activeTx]);
 
   const subData = useMemo(() => {
     const expTx = activeTx.filter((t) => ['bills', 'expenses'].includes(t.category));
+    const chartVars = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-5)', 'var(--chart-3)', 'var(--chart-4)'];
     return Object.entries(groupBySubcategory(expTx))
       .sort((a, b) => b[1].total - a[1].total)
-      .map(([name, data], i) => ({ name, value: data.total, fill: CHART_COLORS[i % CHART_COLORS.length] }));
+      .map(([name, data], i) => ({ name, value: data.total, fill: chartVars[i % chartVars.length] }));
   }, [activeTx]);
 
   const monthlyComparison = useMemo(() =>
@@ -75,12 +74,12 @@ export default function Analytics() {
   const expenseTx = useMemo(() => activeTx.filter((t) => ['bills', 'expenses'].includes(t.category)), [activeTx]);
 
   const pieConfig = useMemo(() => Object.fromEntries(pieData.map((d) => [d.name, { label: d.name, color: d.fill }])), [pieData]);
-  const barConfig = { Income: { color: '#6b7d4a' }, Bills: { color: '#d47d52' }, Expenses: { color: '#bf6438' }, Savings: { color: '#506180' }, Investments: { color: '#9070ad' } };
+  const barConfig = { Income: { color: 'var(--chart-1)' }, Bills: { color: 'var(--chart-2)' }, Expenses: { color: 'var(--chart-5)' }, Savings: { color: 'var(--chart-3)' }, Investments: { color: 'var(--chart-4)' } };
   const subBarConfig = useMemo(() => Object.fromEntries(subData.map((d) => [d.name, { label: d.name, color: d.fill }])), [subData]);
-  const radarConfig = { amount: { label: 'Amount', color: '#6b7d4a' } };
+  const radarConfig = { amount: { label: 'Amount', color: 'var(--chart-1)' } };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold">Analytics</h2>
@@ -109,7 +108,7 @@ export default function Analytics() {
           <Card key={label}>
             <CardContent className="p-3 sm:pt-5">
               <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider mb-0.5 sm:mb-1">{label}</p>
-              <p className={`text-base sm:text-xl font-bold truncate ${color}`}>{isPct ? `${val}%` : formatCurrency(val)}</p>
+              <p className={cn('text-base sm:text-xl font-bold truncate', color)}>{isPct ? `${val}%` : formatCurrency(val)}</p>
             </CardContent>
           </Card>
         ))}
@@ -132,7 +131,7 @@ export default function Analytics() {
                 <div className="flex flex-wrap gap-2 justify-center">
                   {pieData.map((d, i) => (
                     <div key={i} className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.fill }} />
+                      <div className="size-2 rounded-full" style={{ backgroundColor: d.fill }} />
                       <span className="text-xs text-muted-foreground">{d.name}: {formatCurrency(d.value)}</span>
                     </div>
                   ))}
@@ -174,11 +173,11 @@ export default function Analytics() {
                 <XAxis dataKey="month" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} interval={0} />
                 <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(0)}M` : `${(v / 1e3).toFixed(0)}k`} width={40} />
                 <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
-                <Bar dataKey="Income" fill="#6b7d4a" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Bills" fill="#d47d52" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Expenses" fill="#bf6438" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Savings" fill="#506180" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Investments" fill="#9070ad" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Income" fill="var(--chart-1)" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Bills" fill="var(--chart-2)" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Expenses" fill="var(--chart-5)" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Savings" fill="var(--chart-3)" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Investments" fill="var(--chart-4)" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ChartContainer>
           </CardContent>
@@ -192,7 +191,7 @@ export default function Analytics() {
                 <PolarGrid stroke="var(--border)" />
                 <PolarAngleAxis dataKey="category" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} />
                 <PolarRadiusAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} />
-                <Radar name="Amount" dataKey="amount" stroke="#6b7d4a" fill="#6b7d4a" fillOpacity={0.3} />
+                <Radar name="Amount" dataKey="amount" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.3} />
                 <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
               </RadarChart>
             </ChartContainer>
@@ -202,7 +201,7 @@ export default function Analytics() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Quick Stats</CardTitle></CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               {[
                 { label: 'Total Transactions', value: String(activeTx.length) },
                 { label: 'Avg. Transaction', value: activeTx.length > 0 ? formatCurrency(activeTx.reduce((s, t) => s + t.amount, 0) / activeTx.length) : formatCurrency(0) },
@@ -210,9 +209,9 @@ export default function Analytics() {
                 { label: 'Savings Rate', value: `${totals.income > 0 ? Math.round((totals.savings / totals.income) * 100) : 0}%`, color: 'text-chart-3' },
                 { label: 'Investment Rate', value: `${totals.income > 0 ? Math.round((totals.investments / totals.income) * 100) : 0}%`, color: 'text-chart-1' },
               ].map(({ label, value, color }, i, arr) => (
-                <div key={label} className={`flex justify-between items-center ${i < arr.length - 1 ? 'pb-3 border-b border-border/50' : ''}`}>
+                <div key={label} className={cn('flex justify-between items-center', i < arr.length - 1 && 'pb-3 border-b border-border/50')}>
                   <span className="text-sm text-muted-foreground">{label}</span>
-                  <span className={`text-sm font-bold ${color || ''}`}>{value}</span>
+                  <span className={cn('text-sm font-bold', color)}>{value}</span>
                 </div>
               ))}
             </div>

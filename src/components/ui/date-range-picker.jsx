@@ -16,10 +16,6 @@ const PRESETS = [
     getValue: () => getSalaryCycleRange(),
   },
   {
-    label: 'Last Salary Cycle',
-    getValue: () => getSalaryCycleRange(subMonths(new Date(), 1)),
-  },
-  {
     label: 'This Month',
     getValue: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }),
   },
@@ -52,7 +48,7 @@ function formatLabel(value) {
 
 function PresetsPanel({ onSelect, active }) {
   return (
-    <div className="space-y-0.5">
+    <div className="flex flex-col gap-0.5">
       <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1.5">
         Quick Select
       </p>
@@ -78,7 +74,7 @@ function RangeStatus({ value }) {
   );
   return (
     <p className="text-xs text-center py-1.5 flex items-center justify-center gap-1.5 text-chart-1 font-medium">
-      <Check size={12} />
+      <Check className="size-3" />
       {format(value.from, 'MMM d')} – {format(value.to, 'MMM d, yyyy')}
     </p>
   );
@@ -97,12 +93,7 @@ export default function DateRangePicker({ value, onChange }) {
 
   const handleCalendarSelect = useCallback((range) => {
     setDraft(range);
-    // Only auto-close on desktop when both dates are selected
-    if (!isMobile && range?.from && range?.to) {
-      onChange(range);
-      setOpen(false);
-    }
-  }, [onChange, isMobile]);
+  }, []);
 
   const handlePreset = useCallback((range) => {
     setDraft(range);
@@ -126,10 +117,17 @@ export default function DateRangePicker({ value, onChange }) {
         !value?.from && 'text-muted-foreground'
       )}
     >
-      <CalendarRange size={14} />
+      <CalendarRange data-icon="inline-start" />
       <span className="truncate max-w-[160px]">{label}</span>
     </Button>
   );
+
+  const handleDesktopApply = useCallback(() => {
+    if (draft?.from && draft?.to) {
+      onChange(draft);
+      setOpen(false);
+    }
+  }, [draft, onChange]);
 
   // ─── Desktop: Popover ───
   if (!isMobile) {
@@ -138,12 +136,17 @@ export default function DateRangePicker({ value, onChange }) {
         <PopoverTrigger asChild>
           {triggerButton}
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
+        <PopoverContent className="w-auto p-0" align="end" onInteractOutside={(e) => {
+          // Don't close if user is mid-selection (has from but no to)
+          if (draft?.from && !draft?.to) {
+            e.preventDefault();
+          }
+        }}>
           <div className="flex">
             <div className="border-r border-border p-2 w-[170px]">
               <PresetsPanel onSelect={handlePreset} />
             </div>
-            <div className="p-2">
+            <div className="flex flex-col gap-2 p-2">
               <Calendar
                 mode="range"
                 selected={draft}
@@ -152,6 +155,10 @@ export default function DateRangePicker({ value, onChange }) {
                 defaultMonth={value?.from || subMonths(new Date(), 1)}
               />
               <RangeStatus value={draft} />
+              <div className="flex justify-end gap-2 px-2 pb-1">
+                <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button size="sm" onClick={handleDesktopApply} disabled={!draft?.from || !draft?.to}>Apply</Button>
+              </div>
             </div>
           </div>
         </PopoverContent>
@@ -171,7 +178,7 @@ export default function DateRangePicker({ value, onChange }) {
         )}
         onClick={() => handleOpen(true)}
       >
-        <CalendarRange size={14} />
+      <CalendarRange data-icon="inline-start" />
         <span className="truncate max-w-[160px]">{label}</span>
       </Button>
 
