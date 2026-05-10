@@ -18,6 +18,7 @@ import {
   HardDriveDownload,
   Wallet,
   Tags,
+  Scissors,
   Sun,
   Moon,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import Budget from "@/pages/Budget";
 import Reports from "@/pages/Reports";
 import Accounts from "@/pages/Accounts";
 import Categories from "@/pages/Categories";
+import SplitBill from "@/pages/SplitBill";
 import useStore from "@/store/useStore";
 import { exportToExcel } from "@/lib/excel";
 import { cn } from "@/lib/utils";
@@ -53,6 +55,7 @@ const NAV_ITEMS = [
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/accounts", label: "Accounts", icon: Wallet },
   { to: "/categories", label: "Categories", icon: Tags },
+  { to: "/split-bill", label: "Split Bill", icon: Scissors },
 ];
 
 const PAGE_TITLES = {
@@ -63,6 +66,7 @@ const PAGE_TITLES = {
   "/reports": "Reports",
   "/accounts": "Accounts",
   "/categories": "Categories",
+  "/split-bill": "Split Bill",
 };
 
 function SidebarNav({ onNavigate }) {
@@ -345,6 +349,7 @@ function AppShell() {
               <Route path="/reports" element={<Reports />} />
               <Route path="/accounts" element={<Accounts />} />
               <Route path="/categories" element={<Categories />} />
+              <Route path="/split-bill" element={<SplitBill />} />
             </Routes>
           </div>
         </main>
