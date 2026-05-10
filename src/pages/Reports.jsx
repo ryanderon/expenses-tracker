@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Download, TrendingUp, TrendingDown, Scale } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, Scale, Award, Lightbulb, PiggyBank, Landmark } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter,
 } from '@/components/ui/table';
+import { Progress } from '@/components/ui/progress';
 import useStore from '@/store/useStore';
 import { CATEGORIES, getAllCategories } from '@/lib/constants';
 import {
@@ -55,6 +56,48 @@ export default function Reports() {
   const totals = useMemo(() => calculateTotals(activeTx, allCategories), [activeTx, allCategories]);
   const catGroups = useMemo(() => groupByCategory(activeTx), [activeTx]);
   const accGroups = useMemo(() => groupByAccount(activeTx), [activeTx]);
+
+  const savingSummary = useMemo(() => {
+    if (totals.income === 0) return null;
+    const savingRate = Math.round(((totals.savings + totals.investments) / totals.income) * 100);
+    const expenseRate = Math.round((totals.expenses / totals.income) * 100);
+    const investmentRate = Math.round((totals.investments / totals.income) * 100);
+    const pureRate = Math.round((totals.savings / totals.income) * 100);
+
+    let level, color, emoji, message;
+    if (savingRate >= 50) {
+      level = 'Master Saver'; color = 'text-chart-1'; emoji = '🏆';
+      message = 'Exceptional! You\'re saving more than half your income.';
+    } else if (savingRate >= 40) {
+      level = 'Super Saver'; color = 'text-chart-1'; emoji = '🌟';
+      message = 'Outstanding financial discipline! Keep it up.';
+    } else if (savingRate >= 30) {
+      level = 'Great Saver'; color = 'text-chart-3'; emoji = '💪';
+      message = 'You\'re well above the recommended 20% savings rate.';
+    } else if (savingRate >= 20) {
+      level = 'Good Saver'; color = 'text-chart-3'; emoji = '👍';
+      message = 'Solid savings habit — right at the recommended rate.';
+    } else if (savingRate >= 10) {
+      level = 'Building Up'; color = 'text-chart-4'; emoji = '📈';
+      message = 'A good start. Try to reach 20% for better security.';
+    } else if (savingRate > 0) {
+      level = 'Starter'; color = 'text-muted-foreground'; emoji = '🌱';
+      message = 'Every bit counts. Consider automating savings.';
+    } else {
+      level = 'Needs Attention'; color = 'text-destructive'; emoji = '⚠️';
+      message = 'No savings this period. Review expenses for cuts.';
+    }
+
+    const insights = [];
+    if (expenseRate > 70) insights.push('Your expenses take over 70% of income — look for areas to reduce.');
+    if (expenseRate <= 50) insights.push('Great expense control — under 50% of income goes to expenses.');
+    if (investmentRate >= 10) insights.push('Strong investment allocation — your money is working for you.');
+    if (investmentRate === 0 && totals.income > 0) insights.push('Consider allocating some funds to investments for growth.');
+    if (totals.net < 0) insights.push('You spent more than you earned this period — review your budget.');
+    if (pureRate >= 20) insights.push('Excellent cash savings rate — your emergency fund is growing.');
+
+    return { savingRate, expenseRate, investmentRate, pureRate, level, color, emoji, message, insights };
+  }, [totals, allCategories]);
 
   const monthlyBreakdown = useMemo(() => {
     if (reportType !== 'yearly') return [];
@@ -184,6 +227,87 @@ export default function Reports() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Saving Level & Financial Health */}
+      {savingSummary && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Award className="text-chart-4" />
+              <CardTitle>Financial Health</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            {/* Saving Level Badge */}
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/30">
+              <div className="text-4xl">{savingSummary.emoji}</div>
+              <div>
+                <p className={cn('text-xl font-bold', savingSummary.color)}>{savingSummary.level}</p>
+                <p className="text-sm text-muted-foreground">{savingSummary.message}</p>
+              </div>
+            </div>
+
+            {/* Rate Meters */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <PiggyBank className="size-4 text-chart-3" />
+                    <span className="text-xs font-medium">Saving Rate</span>
+                  </div>
+                  <span className="text-sm font-bold text-chart-3">{savingSummary.savingRate}%</span>
+                </div>
+                <Progress value={Math.min(savingSummary.savingRate, 100)} className="h-2" />
+                <p className="text-[11px] text-muted-foreground">
+                  {formatCurrency(totals.savings + totals.investments)} of {formatCurrency(totals.income)}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingDown className="size-4 text-destructive" />
+                    <span className="text-xs font-medium">Expense Rate</span>
+                  </div>
+                  <span className={cn('text-sm font-bold', savingSummary.expenseRate > 70 ? 'text-destructive' : 'text-muted-foreground')}>{savingSummary.expenseRate}%</span>
+                </div>
+                <Progress value={Math.min(savingSummary.expenseRate, 100)} className="h-2" />
+                <p className="text-[11px] text-muted-foreground">
+                  {formatCurrency(totals.expenses)} of {formatCurrency(totals.income)}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Landmark className="size-4 text-chart-4" />
+                    <span className="text-xs font-medium">Investment Rate</span>
+                  </div>
+                  <span className="text-sm font-bold text-chart-4">{savingSummary.investmentRate}%</span>
+                </div>
+                <Progress value={Math.min(savingSummary.investmentRate, 100)} className="h-2" />
+                <p className="text-[11px] text-muted-foreground">
+                  {formatCurrency(totals.investments)} of {formatCurrency(totals.income)}
+                </p>
+              </div>
+            </div>
+
+            {/* Insights */}
+            {savingSummary.insights.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Lightbulb className="size-4 text-chart-2" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Insights</span>
+                </div>
+                {savingSummary.insights.map((insight, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <span className="text-chart-2 mt-0.5">•</span>
+                    <span>{insight}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-sm">Account Usage</CardTitle></CardHeader>
