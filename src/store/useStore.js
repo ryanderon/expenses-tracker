@@ -20,6 +20,9 @@ const useStore = create(
       customCategories: {},
       budgetSettings: { rolloverEnabled: false },
       tourCompleted: false,
+      userName: '',
+
+      setUserName: (name) => set({ userName: name }),
 
       setTourCompleted: (completed) => set({ tourCompleted: completed }),
 
@@ -187,9 +190,9 @@ const useStore = create(
 
       // Data export/import
       exportData: () => {
-        const { transactions, budgets, accounts, customSubcategories, customCategories, budgetSettings } = get();
+        const { transactions, budgets, accounts, customSubcategories, customCategories, budgetSettings, userName } = get();
         return {
-          transactions, budgets, accounts, customSubcategories, customCategories, budgetSettings,
+          transactions, budgets, accounts, customSubcategories, customCategories, budgetSettings, userName,
           exportedAt: new Date().toISOString(), version: 3,
         };
       },
@@ -205,6 +208,7 @@ const useStore = create(
           customSubcategories: data.customSubcategories || {},
           customCategories: data.customCategories || {},
           budgetSettings: data.budgetSettings || { rolloverEnabled: false },
+          userName: data.userName || '',
           tourCompleted: data.tourCompleted ?? false,
         });
       },

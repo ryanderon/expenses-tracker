@@ -41,6 +41,7 @@ import useStore from "@/store/useStore";
 import { exportToExcel } from "@/lib/excel";
 import { cn } from "@/lib/utils";
 import Tour, { TourTrigger } from "@/components/Tour";
+import UserNameModal from "@/components/UserNameModal";
 import useTheme from "@/hooks/useTheme";
 import { Analytics  } from "@vercel/analytics/react";
 
@@ -93,15 +94,24 @@ function SidebarNav({ onNavigate }) {
 }
 
 function DesktopSidebar() {
+  const { userName } = useStore();
+
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-background">
       <div className="flex items-center gap-3 p-5">
         <div className="size-9 rounded-xl bg-primary/10 flex items-center justify-center">
           <span className="text-sm font-bold text-primary">P</span>
         </div>
-        <span className="text-lg font-bold tracking-tight font-serif">
-          Penny
-        </span>
+        <div className="flex flex-col">
+          <span className="text-lg font-bold tracking-tight font-serif leading-tight">
+            Penny
+          </span>
+          {userName && (
+            <span className="text-[11px] text-muted-foreground truncate max-w-[140px]">
+              Hi, {userName}
+            </span>
+          )}
+        </div>
       </div>
       <Separator />
       <SidebarNav />
@@ -126,6 +136,7 @@ function DesktopSidebar() {
 
 function MobileSidebar() {
   const [open, setOpen] = useState(false);
+  const { userName } = useStore();
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -140,9 +151,16 @@ function MobileSidebar() {
           <div className="size-9 rounded-xl bg-primary/10 flex items-center justify-center">
             <span className="text-sm font-bold text-primary">P</span>
           </div>
-          <span className="text-lg font-bold tracking-tight font-serif">
-            Penny
-          </span>
+          <div className="flex flex-col">
+            <span className="text-lg font-bold tracking-tight font-serif leading-tight">
+              Penny
+            </span>
+            {userName && (
+              <span className="text-[11px] text-muted-foreground truncate max-w-[140px]">
+                Hi, {userName}
+              </span>
+            )}
+          </div>
         </div>
         <Separator />
         <SidebarNav onNavigate={() => setOpen(false)} />
@@ -334,6 +352,7 @@ function AppShell() {
 
       <MobileBottomNav />
       <Tour />
+      <UserNameModal />
     </div>
   );
 }
