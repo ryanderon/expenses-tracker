@@ -17,6 +17,7 @@ import {
   Upload,
   HardDriveDownload,
   Wallet,
+  Tags,
   Sun,
   Moon,
 } from "lucide-react";
@@ -35,6 +36,7 @@ import AnalyticsPage from "@/pages/Analytics";
 import Budget from "@/pages/Budget";
 import Reports from "@/pages/Reports";
 import Accounts from "@/pages/Accounts";
+import Categories from "@/pages/Categories";
 import useStore from "@/store/useStore";
 import { exportToExcel } from "@/lib/excel";
 import { cn } from "@/lib/utils";
@@ -49,6 +51,7 @@ const NAV_ITEMS = [
   { to: "/budget", label: "Budget", icon: Target },
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/accounts", label: "Accounts", icon: Wallet },
+  { to: "/categories", label: "Categories", icon: Tags },
 ];
 
 const PAGE_TITLES = {
@@ -58,6 +61,7 @@ const PAGE_TITLES = {
   "/budget": "Budget",
   "/reports": "Reports",
   "/accounts": "Accounts",
+  "/categories": "Categories",
 };
 
 function SidebarNav({ onNavigate }) {
@@ -322,6 +326,7 @@ function AppShell() {
               <Route path="/budget" element={<Budget />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/accounts" element={<Accounts />} />
+              <Route path="/categories" element={<Categories />} />
             </Routes>
           </div>
         </main>

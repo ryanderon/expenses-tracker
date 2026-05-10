@@ -75,26 +75,19 @@ export function filterTransactionsByYear(transactions, year) {
   return transactions.filter((t) => getYearKey(t.date) === String(year));
 }
 
-export function calculateTotals(transactions) {
-  const income = transactions
-    .filter((t) => t.category === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
+import { CATEGORIES } from '@/lib/constants';
 
-  const expenses = transactions
-    .filter((t) => ['bills', 'expenses'].includes(t.category))
-    .reduce((sum, t) => sum + t.amount, 0);
+export function calculateTotals(transactions, allCategories = CATEGORIES) {
+  let income = 0, expenses = 0, savings = 0, investments = 0, transfers = 0;
 
-  const savings = transactions
-    .filter((t) => t.category === 'savings')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const investments = transactions
-    .filter((t) => t.category === 'investments')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const transfers = transactions
-    .filter((t) => t.category === 'transfer')
-    .reduce((sum, t) => sum + t.amount, 0);
+  for (const t of transactions) {
+    const type = allCategories[t.category]?.type;
+    if (type === 'income') income += t.amount;
+    else if (type === 'expense') expenses += t.amount;
+    else if (type === 'savings') savings += t.amount;
+    else if (type === 'investment') investments += t.amount;
+    else if (type === 'transfer') transfers += t.amount;
+  }
 
   return { income, expenses, savings, investments, transfers, net: income - expenses - savings - investments };
 }
@@ -126,20 +119,19 @@ export function groupByAccount(transactions) {
   }, {});
 }
 
-export function getAccountBalance(transactions, accountId) {
+export function getAccountBalance(transactions, accountId, allCategories = CATEGORIES) {
   let balance = 0;
   for (const t of transactions) {
-    if (t.category === 'transfer') {
+    const type = allCategories[t.category]?.type;
+    if (type === 'transfer') {
       if (t.account === accountId) balance -= t.amount;
       if (t.toAccount === accountId) balance += t.amount;
     } else if (t.toAccount && t.account === accountId) {
-      // Investment (or any category) with toAccount: money leaves source
       balance -= t.amount;
     } else if (t.toAccount && t.toAccount === accountId) {
-      // Investment (or any category) with toAccount: money enters destination
       balance += t.amount;
     } else if (t.account === accountId) {
-      balance += t.category === 'income' ? t.amount : -t.amount;
+      balance += type === 'income' ? t.amount : -t.amount;
     }
   }
   return balance;

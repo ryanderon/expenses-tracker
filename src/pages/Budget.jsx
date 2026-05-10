@@ -22,15 +22,17 @@ import {
 import CurrencyInput from '@/components/ui/currency-input';
 import MonthPicker from '@/components/ui/month-picker';
 import useStore from '@/store/useStore';
-import { CATEGORIES } from '@/lib/constants';
+import { CATEGORIES, getAllCategories } from '@/lib/constants';
 import { filterTransactionsByMonth, formatCurrency, cn } from '@/lib/utils';
 
 export default function Budget() {
   const {
     transactions, budgets, setBudget, budgetSettings, setRolloverEnabled,
     copyBudgetFromMonth, prefillBudgetFromSpending,
-    customSubcategories, addCustomSubcategory, removeCustomSubcategory,
+    customSubcategories, customCategories, addCustomSubcategory, removeCustomSubcategory,
   } = useStore();
+
+  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
 
   const [currentMonth, setCurrentMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [editingBudgets, setEditingBudgets] = useState({});
@@ -58,8 +60,8 @@ export default function Budget() {
   const rolloverEnabled = budgetSettings?.rolloverEnabled || false;
 
   const budgetCategories = useMemo(() =>
-    Object.entries(CATEGORIES)
-      .filter(([key]) => key !== 'income' && key !== 'transfer')
+    Object.entries(allCategories)
+      .filter(([, cat]) => cat.type !== 'income' && cat.type !== 'transfer')
       .map(([key, cat]) => {
         const spent = monthTx.filter((t) => t.category === key).reduce((s, t) => s + t.amount, 0);
         const budgetAmt = budgets[currentMonth]?.[key] || 0;
@@ -107,7 +109,7 @@ export default function Budget() {
     if (!selectedCategory || !newSubcategory.trim()) return;
     const name = newSubcategory.trim();
     const existing = [
-      ...(CATEGORIES[selectedCategory]?.subcategories || []),
+      ...(allCategories[selectedCategory]?.subcategories || []),
       ...(customSubcategories[selectedCategory] || []),
     ];
     if (existing.some((s) => s.toLowerCase() === name.toLowerCase())) return;
@@ -116,7 +118,7 @@ export default function Budget() {
   };
 
   const allCustom = Object.entries(customSubcategories).flatMap(([cat, subs]) =>
-    subs.map((s) => ({ category: cat, name: s, label: CATEGORIES[cat]?.label || cat }))
+    subs.map((s) => ({ category: cat, name: s, label: allCategories[cat]?.label || cat }))
   );
 
   return (
@@ -358,8 +360,8 @@ export default function Budget() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                  {Object.entries(CATEGORIES)
-                    .filter(([key]) => key !== 'transfer')
+                  {Object.entries(allCategories)
+                    .filter(([, cat]) => cat.type !== 'transfer')
                     .map(([key, cat]) => (
                       <SelectItem key={key} value={key}>{cat.label}</SelectItem>
                     ))}
@@ -384,7 +386,7 @@ export default function Budget() {
                 <div className="flex flex-wrap gap-2">
                   {allCustom.map((item) => (
                     <Badge key={`${item.category}-${item.name}`} variant="secondary" className="gap-1 pr-1">
-                      <span className="size-2 rounded-full" style={{ backgroundColor: CATEGORIES[item.category]?.hex }} />
+                      <span className="size-2 rounded-full" style={{ backgroundColor: allCategories[item.category]?.hex }} />
                       {item.name}
                       <span className="text-muted-foreground text-[10px]">({item.label})</span>
                       <button

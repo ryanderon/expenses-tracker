@@ -20,7 +20,7 @@ import {
 import PeriodFilter, { usePeriodFilter } from '@/components/ui/period-filter';
 import CurrencyInput from '@/components/ui/currency-input';
 import useStore from '@/store/useStore';
-import { CATEGORIES, CATEGORY_LIST, getSubcategories } from '@/lib/constants';
+import { CATEGORIES, CATEGORY_LIST, getAllCategories, getAllCategoryList, getSubcategories } from '@/lib/constants';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 
 const INITIAL_FORM = {
@@ -38,7 +38,7 @@ function FieldError({ message }) {
 }
 
 function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
-  const { accounts, customSubcategories } = useStore();
+  const { accounts, customSubcategories, customCategories } = useStore();
   const isEditing = !!transaction;
   const [form, setForm] = useState(
     transaction
@@ -48,8 +48,10 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  const subcategories = form.category ? getSubcategories(form.category, customSubcategories) : [];
-  const selectedCat = CATEGORIES[form.category];
+  const allCategoryList = useMemo(() => getAllCategoryList(customCategories), [customCategories]);
+  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
+  const subcategories = form.category ? getSubcategories(form.category, customSubcategories, customCategories) : [];
+  const selectedCat = allCategories[form.category];
 
   const isTransfer = form.category === 'transfer';
   const isInvestment = form.category === 'investments';
@@ -149,7 +151,7 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                    {CATEGORY_LIST.map((c) => (
+                    {allCategoryList.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         <div className="flex items-center gap-2">
                           <div className="size-2.5 rounded-full" style={{ backgroundColor: c.hex }} />
@@ -274,12 +276,13 @@ function TransactionFormDialog({ open, onOpenChange, transaction, onSubmit }) {
 }
 
 function TransactionItem({ transaction, onEdit, onDelete }) {
-  const { accounts } = useStore();
+  const { accounts, customCategories } = useStore();
+  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
   const account = accounts.find((a) => a.id === transaction.account);
   const toAccount = transaction.toAccount ? accounts.find((a) => a.id === transaction.toAccount) : null;
-  const isIncome = transaction.category === 'income';
-  const isTransfer = transaction.category === 'transfer';
-  const cat = CATEGORIES[transaction.category];
+  const cat = allCategories[transaction.category];
+  const isIncome = cat?.type === 'income';
+  const isTransfer = cat?.type === 'transfer';
 
   return (
     <div className="flex items-start sm:items-center gap-3 p-3 rounded-lg hover:bg-secondary/30 transition-colors group">
@@ -347,16 +350,26 @@ function TransactionItem({ transaction, onEdit, onDelete }) {
 }
 
 export default function Transactions() {
-  const { transactions, addTransaction, updateTransaction, deleteTransaction } = useStore();
+  const { transactions, accounts, customCategories, customSubcategories, addTransaction, updateTransaction, deleteTransaction } = useStore();
   const period = usePeriodFilter(transactions);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterSubcategory, setFilterSubcategory] = useState('all');
+  const [filterAccount, setFilterAccount] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTx, setEditingTx] = useState(null);
+
+  const allCategoryList = useMemo(() => getAllCategoryList(customCategories), [customCategories]);
+  const filterSubcategories = useMemo(() => {
+    if (filterCategory === 'all') return [];
+    return getSubcategories(filterCategory, customSubcategories, customCategories);
+  }, [filterCategory, customSubcategories, customCategories]);
 
   const filtered = useMemo(() => {
     let list = period.filtered;
     if (filterCategory !== 'all') list = list.filter((t) => t.category === filterCategory);
+    if (filterSubcategory !== 'all') list = list.filter((t) => t.subcategory === filterSubcategory);
+    if (filterAccount !== 'all') list = list.filter((t) => t.account === filterAccount || t.toAccount === filterAccount);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((t) =>
@@ -365,7 +378,7 @@ export default function Transactions() {
       );
     }
     return list.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [period.filtered, filterCategory, search]);
+  }, [period.filtered, filterCategory, filterSubcategory, filterAccount, search]);
 
   const handleSubmit = (data) => {
     if (editingTx) {
@@ -420,17 +433,48 @@ export default function Transactions() {
             className="pl-9"
           />
         </div>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-            <SelectItem value="all">All Categories</SelectItem>
-            {CATEGORY_LIST.map((c) => (
-              <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-            ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2 flex-wrap">
+          <Select value={filterCategory} onValueChange={(v) => { setFilterCategory(v); setFilterSubcategory('all'); }}>
+            <SelectTrigger className="w-full sm:w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+              <SelectItem value="all">All Categories</SelectItem>
+              {allCategoryList.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+              ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          {filterCategory !== 'all' && filterSubcategories.length > 0 && (
+            <Select value={filterSubcategory} onValueChange={setFilterSubcategory}>
+              <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                <SelectItem value="all">All Subcategories</SelectItem>
+                {filterSubcategories.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          )}
+          <Select value={filterAccount} onValueChange={setFilterAccount}>
+            <SelectTrigger className="w-full sm:w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+              <SelectItem value="all">All Accounts</SelectItem>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  <div className="flex items-center gap-2">
+                    <div className="size-2.5 rounded-full" style={{ backgroundColor: a.color }} />
+                    {a.name}
+                  </div>
+                </SelectItem>
+              ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Card data-tour="transaction-list">
@@ -453,9 +497,9 @@ export default function Transactions() {
               </div>
               <h3 className="text-lg font-semibold mb-1">No transactions</h3>
               <p className="text-sm text-muted-foreground max-w-sm mb-4">
-                {search || filterCategory !== 'all' ? 'Try adjusting your filters' : 'Add your first transaction to get started'}
+                {search || filterCategory !== 'all' || filterAccount !== 'all' ? 'Try adjusting your filters' : 'Add your first transaction to get started'}
               </p>
-              {!search && filterCategory === 'all' && (
+              {!search && filterCategory === 'all' && filterAccount === 'all' && (
                 <Button onClick={openNew}><Plus data-icon="inline-start" /> Add Transaction</Button>
               )}
             </div>

@@ -8,7 +8,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PeriodFilter, { usePeriodFilter } from '@/components/ui/period-filter';
 import useStore from '@/store/useStore';
-import { CATEGORIES } from '@/lib/constants';
+import { CATEGORIES, getAllCategories } from '@/lib/constants';
 import {
   filterTransactionsByMonth, filterTransactionsByYear, calculateTotals,
   formatCurrency, groupBySubcategory, getMonthsInYear, cn,
@@ -17,40 +17,44 @@ import {
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function Analytics() {
-  const { transactions } = useStore();
+  const { transactions, customCategories } = useStore();
   const period = usePeriodFilter(transactions);
   const [view, setView] = useState('monthly');
+  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
 
   const year = parseInt(period.currentMonth.split('-')[0]);
   const activeTx = useMemo(
     () => view === 'yearly' && period.mode === 'month' ? filterTransactionsByYear(transactions, year) : period.filtered,
     [transactions, period.filtered, period.mode, year, view]
   );
-  const totals = useMemo(() => calculateTotals(activeTx), [activeTx]);
+  const totals = useMemo(() => calculateTotals(activeTx, allCategories), [activeTx, allCategories]);
 
   const pieData = useMemo(() =>
-    Object.entries(CATEGORIES)
-      .filter(([key]) => key !== 'transfer')
+    Object.entries(allCategories)
+      .filter(([, cat]) => cat.type !== 'transfer')
       .map(([key, cat]) => ({
         name: cat.label,
         value: activeTx.filter((t) => t.category === key).reduce((s, t) => s + t.amount, 0),
         fill: cat.hex,
       }))
       .filter((d) => d.value > 0),
-  [activeTx]);
+  [activeTx, allCategories]);
 
   const subData = useMemo(() => {
-    const expTx = activeTx.filter((t) => ['bills', 'expenses'].includes(t.category));
+    const expTx = activeTx.filter((t) => {
+      const type = allCategories[t.category]?.type;
+      return type === 'expense';
+    });
     const chartVars = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-5)', 'var(--chart-3)', 'var(--chart-4)'];
     return Object.entries(groupBySubcategory(expTx))
       .sort((a, b) => b[1].total - a[1].total)
       .map(([name, data], i) => ({ name, value: data.total, fill: chartVars[i % chartVars.length] }));
-  }, [activeTx]);
+  }, [activeTx, allCategories]);
 
   const monthlyComparison = useMemo(() =>
     getMonthsInYear(year).map((mk) => {
       const mTx = filterTransactionsByMonth(transactions, mk);
-      const mt = calculateTotals(mTx);
+      const mt = calculateTotals(mTx, allCategories);
       return {
         month: MONTHS_SHORT[parseInt(mk.split('-')[1]) - 1],
         Income: mt.income,
@@ -60,18 +64,21 @@ export default function Analytics() {
         Investments: mt.investments,
       };
     }),
-  [transactions, year]);
+  [transactions, year, allCategories]);
 
   const radarData = useMemo(() =>
-    Object.entries(CATEGORIES)
-      .filter(([key]) => key !== 'income' && key !== 'transfer')
+    Object.entries(allCategories)
+      .filter(([, cat]) => cat.type !== 'income' && cat.type !== 'transfer')
       .map(([key, cat]) => ({
         category: cat.label,
         amount: activeTx.filter((t) => t.category === key).reduce((s, t) => s + t.amount, 0),
       })),
-  [activeTx]);
+  [activeTx, allCategories]);
 
-  const expenseTx = useMemo(() => activeTx.filter((t) => ['bills', 'expenses'].includes(t.category)), [activeTx]);
+  const expenseTx = useMemo(() => activeTx.filter((t) => {
+    const type = allCategories[t.category]?.type;
+    return type === 'expense';
+  }), [activeTx, allCategories]);
 
   const pieConfig = useMemo(() => Object.fromEntries(pieData.map((d) => [d.name, { label: d.name, color: d.fill }])), [pieData]);
   const barConfig = { Income: { color: 'var(--chart-1)' }, Bills: { color: 'var(--chart-2)' }, Expenses: { color: 'var(--chart-5)' }, Savings: { color: 'var(--chart-3)' }, Investments: { color: 'var(--chart-4)' } };

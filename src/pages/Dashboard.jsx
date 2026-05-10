@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import PeriodFilter, { usePeriodFilter } from '@/components/ui/period-filter';
 import useStore from '@/store/useStore';
-import { CATEGORIES } from '@/lib/constants';
+import { CATEGORIES, getAllCategories } from '@/lib/constants';
 import {
   filterTransactionsByMonth, calculateTotals, formatCurrency,
   groupBySubcategory, getMonthsInYear, getAccountBalance, cn,
@@ -19,42 +19,46 @@ import {
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function Dashboard() {
-  const { transactions, accounts } = useStore();
+  const { transactions, accounts, customCategories } = useStore();
   const navigate = useNavigate();
   const period = usePeriodFilter(transactions);
   const { filtered: monthTx, currentMonth } = period;
-  const totals = useMemo(() => calculateTotals(monthTx), [monthTx]);
+  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
+  const totals = useMemo(() => calculateTotals(monthTx, allCategories), [monthTx, allCategories]);
 
   const categoryData = useMemo(() =>
-    Object.entries(CATEGORIES)
-      .filter(([key]) => key !== 'income' && key !== 'transfer')
+    Object.entries(allCategories)
+      .filter(([, cat]) => cat.type !== 'income' && cat.type !== 'transfer')
       .map(([key, cat]) => ({
         name: cat.label,
         value: monthTx.filter((t) => t.category === key).reduce((s, t) => s + t.amount, 0),
         fill: cat.hex,
       }))
       .filter((d) => d.value > 0),
-  [monthTx]);
+  [monthTx, allCategories]);
 
   const accountBalances = useMemo(() =>
-    accounts.map((acc) => ({ ...acc, balance: getAccountBalance(transactions, acc.id) })),
-  [transactions, accounts]);
+    accounts.map((acc) => ({ ...acc, balance: getAccountBalance(transactions, acc.id, allCategories) })),
+  [transactions, accounts, allCategories]);
 
   const year = currentMonth.split('-')[0];
   const trendData = useMemo(() =>
     getMonthsInYear(parseInt(year)).map((mk) => {
       const mTx = filterTransactionsByMonth(transactions, mk);
-      const mt = calculateTotals(mTx);
+      const mt = calculateTotals(mTx, allCategories);
       return { month: MONTHS_SHORT[parseInt(mk.split('-')[1]) - 1], Income: mt.income, Expenses: mt.expenses };
     }),
-  [transactions, year]);
+  [transactions, year, allCategories]);
 
   const topSpending = useMemo(() => {
-    const expTx = monthTx.filter((t) => ['bills', 'expenses'].includes(t.category));
+    const expTx = monthTx.filter((t) => {
+      const type = allCategories[t.category]?.type;
+      return type === 'expense';
+    });
     return Object.entries(groupBySubcategory(expTx))
       .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 5);
-  }, [monthTx]);
+  }, [monthTx, allCategories]);
 
   const pieConfig = useMemo(() => Object.fromEntries(categoryData.map((d) => [d.name, { label: d.name, color: d.fill }])), [categoryData]);
   const areaConfig = { Income: { color: 'var(--chart-1)' }, Expenses: { color: 'var(--chart-2)' } };

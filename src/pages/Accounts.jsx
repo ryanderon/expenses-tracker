@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Pencil, Trash2, Wallet } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import useStore from '@/store/useStore';
-import { ACCOUNT_COLORS } from '@/lib/constants';
+import { ACCOUNT_COLORS, getAllCategories } from '@/lib/constants';
 import { formatCurrency, getAccountBalance, cn } from '@/lib/utils';
 
 const INITIAL_FORM = { name: '', type: '', color: ACCOUNT_COLORS[0] };
@@ -70,9 +70,10 @@ function AccountFormDialog({ open, onOpenChange, account, onSubmit }) {
 }
 
 export default function Accounts() {
-  const { accounts, transactions, addAccount, updateAccount, deleteAccount } = useStore();
+  const { accounts, transactions, customCategories, addAccount, updateAccount, deleteAccount } = useStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
+  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
 
   const handleSubmit = (data) => {
     if (editingAccount) {
@@ -94,7 +95,7 @@ export default function Accounts() {
     deleteAccount(id);
   };
 
-  const getBalance = (accId) => getAccountBalance(transactions, accId);
+  const getBalance = (accId) => getAccountBalance(transactions, accId, allCategories);
 
   const getTxCount = (accId) => transactions.filter((t) => t.account === accId).length;
 

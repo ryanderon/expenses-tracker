@@ -12,7 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter,
 } from '@/components/ui/table';
 import useStore from '@/store/useStore';
-import { CATEGORIES } from '@/lib/constants';
+import { CATEGORIES, getAllCategories } from '@/lib/constants';
 import {
   filterTransactionsByMonth, filterTransactionsByYear, filterTransactionsByDateRange,
   calculateTotals, formatCurrency, groupByCategory, groupBySubcategory, groupByAccount,
@@ -25,7 +25,8 @@ import DateRangePicker from '@/components/ui/date-range-picker';
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export default function Reports() {
-  const { transactions, accounts } = useStore();
+  const { transactions, accounts, customCategories } = useStore();
+  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
   const [reportType, setReportType] = useState('monthly');
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
@@ -51,7 +52,7 @@ export default function Reports() {
     [transactions, reportType, selectedMonth, selectedYear, dateRange]
   );
 
-  const totals = useMemo(() => calculateTotals(activeTx), [activeTx]);
+  const totals = useMemo(() => calculateTotals(activeTx, allCategories), [activeTx, allCategories]);
   const catGroups = useMemo(() => groupByCategory(activeTx), [activeTx]);
   const accGroups = useMemo(() => groupByAccount(activeTx), [activeTx]);
 
@@ -59,10 +60,10 @@ export default function Reports() {
     if (reportType !== 'yearly') return [];
     return getMonthsInYear(parseInt(selectedYear)).map((mk) => {
       const mTx = filterTransactionsByMonth(transactions, mk);
-      const mt = calculateTotals(mTx);
+      const mt = calculateTotals(mTx, allCategories);
       return { month: MONTHS[parseInt(mk.split('-')[1]) - 1], ...mt, txCount: mTx.length };
     });
-  }, [transactions, reportType, selectedYear]);
+  }, [transactions, reportType, selectedYear, allCategories]);
 
   const handleExport = () => {
     let label;
@@ -82,7 +83,7 @@ export default function Reports() {
       <div key={catKey} className="border-b border-border/50">
         <div className="bg-secondary/30 px-4 py-2.5">
           <span className={cn('text-xs font-bold uppercase tracking-wider', titleColor)}>
-            {CATEGORIES[catKey].label}
+            {allCategories[catKey]?.label}
           </span>
         </div>
         {catTx.length > 0 ? (
@@ -94,12 +95,12 @@ export default function Reports() {
               </div>
             ))}
             <div className="flex justify-between px-4 py-2.5 bg-secondary/20 font-semibold">
-              <span className={cn('text-sm', titleColor)}>Total {CATEGORIES[catKey].label}</span>
+              <span className={cn('text-sm', titleColor)}>Total {allCategories[catKey]?.label}</span>
               <span className={cn('text-sm tabular-nums', titleColor)}>{formatCurrency(catTotal)}</span>
             </div>
           </>
         ) : (
-          <div className="px-4 py-3 text-sm text-muted-foreground">No {CATEGORIES[catKey].label.toLowerCase()} recorded</div>
+          <div className="px-4 py-3 text-sm text-muted-foreground">No {allCategories[catKey]?.label.toLowerCase()} recorded</div>
         )}
       </div>
     );
@@ -165,6 +166,9 @@ export default function Reports() {
             {renderCategorySection('expenses', 'text-destructive')}
             {renderCategorySection('savings', 'text-chart-3')}
             {renderCategorySection('investments', 'text-chart-4')}
+            {Object.entries(customCategories).map(([key]) =>
+              renderCategorySection(key, 'text-muted-foreground')
+            )}
 
             <div className="bg-secondary/40 px-4 py-4">
               <div className="flex justify-between items-center">

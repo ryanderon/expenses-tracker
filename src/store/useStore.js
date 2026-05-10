@@ -17,6 +17,7 @@ const useStore = create(
       budgets: {},
       accounts: DEFAULT_ACCOUNTS,
       customSubcategories: {},
+      customCategories: {},
       budgetSettings: { rolloverEnabled: false },
       tourCompleted: false,
 
@@ -96,6 +97,50 @@ const useStore = create(
           },
         })),
 
+      // Custom categories CRUD
+      addCustomCategory: (id, category) =>
+        set((state) => ({
+          customCategories: { ...state.customCategories, [id]: category },
+        })),
+
+      updateCustomCategory: (id, updates) =>
+        set((state) => ({
+          customCategories: {
+            ...state.customCategories,
+            [id]: { ...state.customCategories[id], ...updates },
+          },
+        })),
+
+      deleteCustomCategory: (id) =>
+        set((state) => {
+          const { [id]: _, ...rest } = state.customCategories;
+          return { customCategories: rest };
+        }),
+
+      addSubcategoryToCustomCategory: (categoryKey, name) =>
+        set((state) => {
+          const cat = state.customCategories[categoryKey];
+          if (!cat || cat.subcategories.includes(name)) return state;
+          return {
+            customCategories: {
+              ...state.customCategories,
+              [categoryKey]: { ...cat, subcategories: [...cat.subcategories, name] },
+            },
+          };
+        }),
+
+      removeSubcategoryFromCustomCategory: (categoryKey, name) =>
+        set((state) => {
+          const cat = state.customCategories[categoryKey];
+          if (!cat) return state;
+          return {
+            customCategories: {
+              ...state.customCategories,
+              [categoryKey]: { ...cat, subcategories: cat.subcategories.filter((s) => s !== name) },
+            },
+          };
+        }),
+
       // Budget settings
       setRolloverEnabled: (enabled) =>
         set((state) => ({
@@ -122,7 +167,11 @@ const useStore = create(
             (t) => t.date.substring(0, 7) === sourceMonth
           );
           const newBudgets = {};
-          ['bills', 'expenses', 'savings', 'investments'].forEach((cat) => {
+          const budgetCats = [
+            'bills', 'expenses', 'savings', 'investments',
+            ...Object.keys(state.customCategories),
+          ];
+          budgetCats.forEach((cat) => {
             const spent = sourceTx
               .filter((t) => t.category === cat)
               .reduce((sum, t) => sum + t.amount, 0);
@@ -138,10 +187,10 @@ const useStore = create(
 
       // Data export/import
       exportData: () => {
-        const { transactions, budgets, accounts, customSubcategories, budgetSettings } = get();
+        const { transactions, budgets, accounts, customSubcategories, customCategories, budgetSettings } = get();
         return {
-          transactions, budgets, accounts, customSubcategories, budgetSettings,
-          exportedAt: new Date().toISOString(), version: 2,
+          transactions, budgets, accounts, customSubcategories, customCategories, budgetSettings,
+          exportedAt: new Date().toISOString(), version: 3,
         };
       },
 
@@ -154,6 +203,7 @@ const useStore = create(
           accounts: data.accounts,
           budgets: data.budgets || {},
           customSubcategories: data.customSubcategories || {},
+          customCategories: data.customCategories || {},
           budgetSettings: data.budgetSettings || { rolloverEnabled: false },
           tourCompleted: data.tourCompleted ?? false,
         });
