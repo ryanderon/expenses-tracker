@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -89,59 +88,61 @@ function PersonAvatar({ person, size = 'md', selected, onClick, showRemove, onRe
   );
 }
 
-function BillItemCard({ item, people, onUpdate, onDelete, onTogglePerson }) {
-  const [expanded, setExpanded] = useState(false);
+function BillItemCard({ item, index, people, onUpdate, onDelete, onTogglePerson }) {
+  const itemTotal = item.price * item.qty;
 
   return (
-    <div className="border border-border/50 rounded-xl p-3 bg-background transition-all">
-      <div className="flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <Input
-              value={item.name}
-              onChange={(e) => onUpdate({ name: e.target.value })}
-              className="h-7 text-sm font-medium border-0 p-0 shadow-none focus-visible:ring-0 bg-transparent"
-              placeholder="Item name"
-            />
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <CurrencyInput
-            name={`item-${item.id}`}
-            value={item.price || ''}
-            onChange={(e) => onUpdate({ price: Number(e.target.value) || 0 })}
-            className="h-7 w-28 text-sm text-right border-0 p-0 pr-1 shadow-none focus-visible:ring-0 bg-transparent font-semibold tabular-nums"
-          />
-          <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => setExpanded(!expanded)}>
-            {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-          </Button>
-          <Button variant="ghost" size="icon" className="size-7 text-destructive hover:bg-destructive/10 shrink-0" onClick={onDelete}>
-            <Trash2 className="size-3.5" />
-          </Button>
-        </div>
+    <div className="border border-border rounded-xl p-4 bg-background">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs text-muted-foreground">Item {index + 1}</span>
+        <Button variant="ghost" size="icon" className="size-7 text-destructive hover:bg-destructive/10" onClick={onDelete}>
+          <Trash2 className="size-3.5" />
+        </Button>
       </div>
 
-      {expanded && (
-        <div className="mt-3 pt-3 border-t border-border/30">
-          <div className="flex items-center gap-2 mb-2">
-            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Qty</Label>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">Name</Label>
+          <Input
+            value={item.name}
+            onChange={(e) => onUpdate({ name: e.target.value })}
+            placeholder="Item name"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs text-muted-foreground">Price</Label>
+            <CurrencyInput
+              name={`item-${item.id}`}
+              value={item.price || ''}
+              onChange={(e) => onUpdate({ price: Number(e.target.value) || 0 })}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs text-muted-foreground">Qty</Label>
             <Input
               type="number"
               min="1"
               value={item.qty}
               onChange={(e) => onUpdate({ qty: Math.max(1, parseInt(e.target.value) || 1) })}
-              className="h-7 w-16 text-sm text-center"
+              className="tabular-nums"
             />
-            <span className="text-xs text-muted-foreground ml-auto">
-              Total: {formatCurrency(item.price * item.qty)}
-            </span>
           </div>
         </div>
-      )}
+
+        {itemTotal > 0 && (
+          <div className="flex justify-end">
+            <span className="text-xs text-muted-foreground">
+              Total: <span className="font-medium text-foreground tabular-nums">{formatCurrency(itemTotal)}</span>
+            </span>
+          </div>
+        )}
+      </div>
 
       {people.length > 0 && (
-        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Person:</span>
+        <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border/50 flex-wrap">
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Split:</span>
           {people.map((p) => {
             const isAssigned = item.assignedTo.includes(p.id);
             return (
@@ -156,7 +157,7 @@ function BillItemCard({ item, people, onUpdate, onDelete, onTogglePerson }) {
           })}
           {item.assignedTo.length > 0 && (
             <span className="text-[11px] text-muted-foreground ml-1">
-              ({formatCurrency(Math.round((item.price * item.qty) / item.assignedTo.length))}/person)
+              ({formatCurrency(Math.round(itemTotal / item.assignedTo.length))}/person)
             </span>
           )}
         </div>
@@ -178,7 +179,6 @@ export default function SplitBill() {
   const [ocrError, setOcrError] = useState('');
   const [newPersonName, setNewPersonName] = useState('');
   const [showAddPerson, setShowAddPerson] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
   const fileInputRef = useRef(null);
 
   const addItem = useCallback(() => {
@@ -228,10 +228,9 @@ export default function SplitBill() {
   }, []);
 
   const resetAll = useCallback(() => {
-    if (items.length > 0 && !window.confirm('Reset all items and extras?')) return;
     setItems([]);
     setExtras({ tax: '', serviceCharge: '', discount: '' });
-  }, [items.length]);
+  }, []);
 
   const handleOcrUpload = useCallback(async (e) => {
     const file = e.target.files?.[0];
@@ -429,7 +428,7 @@ export default function SplitBill() {
             </div>
             <div className="flex gap-2">
               {items.length > 0 && (
-                <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={resetAll}>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={resetAll}>
                   <RotateCcw className="size-3.5 mr-1" /> Reset
                 </Button>
               )}
@@ -445,7 +444,7 @@ export default function SplitBill() {
           </div>
 
           {items.length > 0 ? (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
               {items.map((item, i) => (
                 <BillItemCard
                   key={item.id}
