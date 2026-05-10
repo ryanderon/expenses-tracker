@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
 import {
   Camera, Plus, Trash2, Users, Receipt, ScanLine, Loader2,
-  Share2, X, UserPlus, ImagePlus, ChevronDown, ChevronUp,
+  Share2, X, UserPlus, ImagePlus, RotateCcw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -141,7 +141,7 @@ function BillItemCard({ item, people, onUpdate, onDelete, onTogglePerson }) {
 
       {people.length > 0 && (
         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Split:</span>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Person:</span>
           {people.map((p) => {
             const isAssigned = item.assignedTo.includes(p.id);
             return (
@@ -226,6 +226,12 @@ export default function SplitBill() {
       assignedTo: item.assignedTo.filter((pid) => pid !== id),
     })));
   }, []);
+
+  const resetAll = useCallback(() => {
+    if (items.length > 0 && !window.confirm('Reset all items and extras?')) return;
+    setItems([]);
+    setExtras({ tax: '', serviceCharge: '', discount: '' });
+  }, [items.length]);
 
   const handleOcrUpload = useCallback(async (e) => {
     const file = e.target.files?.[0];
@@ -422,6 +428,11 @@ export default function SplitBill() {
               <span className="text-sm font-semibold">Items ({items.length})</span>
             </div>
             <div className="flex gap-2">
+              {items.length > 0 && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={resetAll}>
+                  <RotateCcw className="size-3.5 mr-1" /> Reset
+                </Button>
+              )}
               {items.length > 0 && people.length > 1 && (
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={assignAllToEveryone}>
                   Split All Equally
@@ -435,10 +446,11 @@ export default function SplitBill() {
 
           {items.length > 0 ? (
             <div className="flex flex-col gap-2">
-              {items.map((item) => (
+              {items.map((item, i) => (
                 <BillItemCard
                   key={item.id}
                   item={item}
+                  index={i}
                   people={people}
                   onUpdate={(updates) => updateItem(item.id, updates)}
                   onDelete={() => deleteItem(item.id)}

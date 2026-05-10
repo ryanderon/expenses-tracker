@@ -135,7 +135,7 @@ function CategoryCard({ categoryKey, category, isBuiltIn, customSubs, onAddSub, 
   const defaultSubs = category.subcategories || [];
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden" py="pb-4">
       <div className="h-1.5" style={{ backgroundColor: category.hex }} />
       <CardContent className="p-4 pt-4">
         <div className="flex items-start justify-between mb-3">
