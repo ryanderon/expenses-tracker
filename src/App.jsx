@@ -97,7 +97,7 @@ function SidebarNav({ onNavigate }) {
   );
 }
 
-function DesktopSidebar() {
+function DesktopSidebar({ onEditName }) {
   const { userName } = useStore();
 
   return (
@@ -111,9 +111,9 @@ function DesktopSidebar() {
             Penny
           </span>
           {userName && (
-            <span className="text-[11px] text-muted-foreground truncate max-w-[140px]">
+            <button onClick={onEditName} className="text-[13px] mt-[1px] font-serif text-muted-foreground truncate max-w-[140px] hover:text-foreground transition-colors cursor-pointer text-left">
               Hi, {userName}
-            </span>
+            </button>
           )}
         </div>
       </div>
@@ -138,7 +138,7 @@ function DesktopSidebar() {
   );
 }
 
-function MobileSidebar() {
+function MobileSidebar({ onEditName }) {
   const [open, setOpen] = useState(false);
   const { userName } = useStore();
 
@@ -160,9 +160,9 @@ function MobileSidebar() {
               Penny
             </span>
             {userName && (
-              <span className="text-[11px] text-muted-foreground truncate max-w-[140px]">
+              <button onClick={() => { onEditName(); setOpen(false); }} className="text-[13px] mt-[1px] font-serif text-muted-foreground truncate max-w-[140px] hover:text-foreground transition-colors cursor-pointer text-left">
                 Hi, {userName}
-              </span>
+              </button>
             )}
           </div>
         </div>
@@ -194,6 +194,7 @@ function AppShell() {
   const { theme, toggle: toggleTheme } = useTheme();
   const title = PAGE_TITLES[location.pathname] || "Penny";
   const fileInputRef = useRef(null);
+  const [editNameOpen, setEditNameOpen] = useState(false);
 
   const handleExport = () =>
     exportToExcel(transactions, accounts, "penny-all-transactions");
@@ -243,11 +244,11 @@ function AppShell() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <DesktopSidebar />
+      <DesktopSidebar onEditName={() => setEditNameOpen(true)} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="flex items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 lg:px-6 border-b border-border bg-background/90 backdrop-blur-sm sticky top-0">
           <div className="flex items-center gap-2 sm:gap-3">
-            <MobileSidebar />
+            <MobileSidebar onEditName={() => setEditNameOpen(true)} />
             <h1 className="hidden lg:block text-lg font-bold">{title}</h1>
           </div>
           <div
@@ -357,7 +358,7 @@ function AppShell() {
 
       <MobileBottomNav />
       <Tour />
-      <UserNameModal />
+      <UserNameModal editOpen={editNameOpen} onEditClose={() => setEditNameOpen(false)} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -8,29 +8,43 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import useStore from '@/store/useStore';
 
-export default function UserNameModal() {
+export default function UserNameModal({ editOpen, onEditClose }) {
   const { userName, setUserName } = useStore();
   const [name, setName] = useState('');
-  const open = !userName;
+  const isFirstTime = !userName;
+  const open = isFirstTime || editOpen;
+
+  useEffect(() => {
+    if (editOpen && userName) setName(userName);
+  }, [editOpen, userName]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
     setUserName(name.trim());
+    setName('');
+    onEditClose?.();
+  };
+
+  const handleOpenChange = (v) => {
+    if (!v && !isFirstTime) {
+      setName('');
+      onEditClose?.();
+    }
   };
 
   if (!open) return null;
 
   return (
-    <Dialog open={open}>
-      <DialogContent className="sm:max-w-sm" showCloseButton={false} onPointerDownOutside={(e) => e.preventDefault()}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-sm" showCloseButton={!isFirstTime} onPointerDownOutside={isFirstTime ? (e) => e.preventDefault() : undefined}>
         <DialogHeader className="items-center text-center">
           <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-2 mx-auto">
             <User className="text-primary size-7" />
           </div>
-          <DialogTitle className="text-xl">Welcome to Penny!</DialogTitle>
+          <DialogTitle className="text-xl">{isFirstTime ? 'Welcome to Penny!' : 'Change Name'}</DialogTitle>
           <DialogDescription>
-            What should we call you? This helps personalize your experience.
+            {isFirstTime ? 'What should we call you? This helps personalize your experience.' : 'Update your display name.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
@@ -44,7 +58,7 @@ export default function UserNameModal() {
             />
           </div>
           <Button type="submit" disabled={!name.trim()} className="w-full">
-            Get Started
+            {isFirstTime ? 'Get Started' : 'Save'}
           </Button>
         </form>
       </DialogContent>
