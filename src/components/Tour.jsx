@@ -1,96 +1,58 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { X, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import useStore from '@/store/useStore';
+import { useT } from '@/hooks/useT';
 
+// Steps reference i18n keys; the copy itself lives in the locale files.
 const TOUR_STEPS = [
-  // Dashboard
   {
     route: '/',
-    target: '[data-tour="month-picker"]',
-    title: 'Month Picker',
-    description: 'Switch between months to view your financial data for any period.',
-    position: 'bottom',
-  },
-  {
-    route: '/',
-    target: '[data-tour="stat-cards"]',
-    title: 'Financial Overview',
-    description: 'Quick summary of your income, expenses, savings, investments, and net balance for the selected month.',
+    target: '[data-tour="today-hero"]',
+    titleKey: 'tour.todayTitle',
+    bodyKey: 'tour.todayBody',
     position: 'bottom',
   },
   {
     route: '/',
-    target: '[data-tour="charts"]',
-    title: 'Visual Insights',
-    description: 'See your spending breakdown and top categories at a glance with interactive charts.',
-    position: 'top',
-  },
-
-  // Transactions
-  {
-    route: '/transactions',
-    target: '[data-tour="add-transaction"]',
-    title: 'Add Transaction',
-    description: 'Tap here to record a new income, expense, transfer, or investment. This is where it all starts!',
+    target: '[data-tour="today-add"]',
+    titleKey: 'tour.addTitle',
+    bodyKey: 'tour.addBody',
     position: 'bottom',
   },
-  {
-    route: '/transactions',
-    target: '[data-tour="search-filter"]',
-    title: 'Search & Filter',
-    description: 'Quickly find transactions by searching keywords or filtering by category.',
-    position: 'bottom',
-  },
-  {
-    route: '/transactions',
-    target: '[data-tour="transaction-list"]',
-    title: 'Transaction List',
-    description: 'All your transactions for the month. Tap any item to edit or delete it.',
-    position: 'top',
-  },
-
-  // Budget
   {
     route: '/budget',
     target: '[data-tour="budget-actions"]',
-    title: 'Budget Tools',
-    description: 'Enable budget rollover, copy last month\'s budget, or auto-fill from your actual spending. You can also manage custom categories here.',
+    titleKey: 'tour.budgetTitle',
+    bodyKey: 'tour.budgetBody',
     position: 'bottom',
   },
   {
-    route: '/budget',
-    target: '[data-tour="budget-summary"]',
-    title: 'Budget Summary',
-    description: 'Track your income, total budget, spending, and unallocated money at a glance.',
+    route: '/insights',
+    target: '[data-tour="insights-header"]',
+    titleKey: 'tour.insightsTitle',
+    bodyKey: 'tour.insightsBody',
     position: 'bottom',
   },
   {
-    route: '/budget',
-    target: '[data-tour="budget-cards"]',
-    title: 'Category Budgets',
-    description: 'Set a spending limit for each category. The progress bar shows how much you\'ve used. Edit the amount and hit Save.',
+    route: '/more',
+    target: '[data-tour="more-list"]',
+    titleKey: 'tour.moreTitle',
+    bodyKey: 'tour.moreBody',
     position: 'top',
-  },
-
-  // Header actions
-  {
-    route: '/',
-    target: '[data-tour="header-actions"]',
-    title: 'Backup & Export',
-    description: 'Back up your data as JSON, restore from a backup, or export everything to Excel. Your data stays safe!',
-    position: 'bottom',
   },
 ];
 
-function getTooltipStyle(rect, position, tooltipRef) {
+/** Size assumed before the tooltip has been measured once. */
+const DEFAULT_TOOLTIP_SIZE = { width: 320, height: 160 };
+
+function getTooltipStyle(rect, position, size) {
   if (!rect) return { top: 0, left: 0 };
 
-  const tooltip = tooltipRef?.current;
-  const tooltipWidth = tooltip?.offsetWidth || 320;
-  const tooltipHeight = tooltip?.offsetHeight || 160;
+  const tooltipWidth = size.width;
+  const tooltipHeight = size.height;
   const pad = 12;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -136,8 +98,25 @@ export default function Tour() {
   const { tourCompleted, setTourCompleted } = useStore();
   const [active, setActive] = useState(false);
   const [step, setStep] = useState(0);
+  const t = useT();
   const [targetRect, setTargetRect] = useState(null);
-  const tooltipRef = useRef(null);
+  const [tooltipSize, setTooltipSize] = useState(DEFAULT_TOOLTIP_SIZE);
+
+  // The tooltip is positioned from its own measured size, so it has to be
+  // measured after it mounts — reading a ref during render would give the
+  // placeholder size on the first pass and never correct itself.
+  const tooltipRef = useCallback((node) => {
+    if (!node) return undefined;
+    const observer = new ResizeObserver(() => {
+      setTooltipSize((prev) =>
+        prev.width === node.offsetWidth && prev.height === node.offsetHeight
+          ? prev
+          : { width: node.offsetWidth, height: node.offsetHeight }
+      );
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -222,7 +201,7 @@ export default function Tour() {
 
   if (!active || !currentStep) return null;
 
-  const tooltipPos = getTooltipStyle(targetRect, currentStep.position, tooltipRef);
+  const tooltipPos = getTooltipStyle(targetRect, currentStep.position, tooltipSize);
 
   return (
     <div className="fixed inset-0 z-[100]">
@@ -278,14 +257,14 @@ export default function Tour() {
         <div
           ref={tooltipRef}
           role="dialog"
-          aria-label={currentStep.title}
+          aria-label={t(currentStep.titleKey)}
           className="absolute w-[320px] bg-background border border-border rounded-xl shadow-lg p-4 transition-all duration-300 animate-in fade-in-0 zoom-in-95"
           style={{ top: tooltipPos.top, left: tooltipPos.left, pointerEvents: 'auto' }}
         >
           <div className="flex items-start justify-between gap-2 mb-2">
             <h3 className="text-sm font-bold flex items-center gap-1.5">
               <Sparkles className="text-primary size-3.5" />
-              {currentStep.title}
+              {t(currentStep.titleKey)}
             </h3>
             <button onClick={endTour} className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
               <X className="size-3.5" />
@@ -293,12 +272,12 @@ export default function Tour() {
           </div>
 
           <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-            {currentStep.description}
+            {t(currentStep.bodyKey)}
           </p>
 
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground tabular-nums">
-              {step + 1} / {TOUR_STEPS.length}
+              {t('tour.step', { current: step + 1, total: TOUR_STEPS.length })}
             </span>
 
             <div className="flex items-center gap-2">
@@ -308,7 +287,7 @@ export default function Tour() {
                 className="h-7 text-xs"
                 onClick={endTour}
               >
-                Skip
+                {t('common.skip')}
               </Button>
               {step > 0 && (
                 <Button
@@ -318,7 +297,7 @@ export default function Tour() {
                   onClick={prev}
                 >
                   <ChevronLeft data-icon="inline-start" />
-                  Back
+                  {t('common.back')}
                 </Button>
               )}
               <Button
@@ -326,7 +305,7 @@ export default function Tour() {
                 className="h-7 text-xs"
                 onClick={next}
               >
-                {step === TOUR_STEPS.length - 1 ? 'Finish' : 'Next'}
+                {step === TOUR_STEPS.length - 1 ? t('tour.finish') : t('common.next')}
                 {step < TOUR_STEPS.length - 1 && <ChevronRight data-icon="inline-end" />}
               </Button>
             </div>
@@ -351,6 +330,7 @@ export default function Tour() {
 }
 
 export function TourTrigger() {
+  const t = useT();
   const { setTourCompleted } = useStore();
 
   const restartTour = () => {
@@ -361,7 +341,7 @@ export function TourTrigger() {
   return (
     <Button variant="outline" size="sm" onClick={restartTour} className="gap-1.5">
       <Sparkles data-icon="inline-start" />
-      <span className="hidden sm:inline">Tour</span>
+      <span className="hidden sm:inline">{t('tour.start')}</span>
     </Button>
   );
 }

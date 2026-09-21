@@ -1,6 +1,10 @@
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { format, parse, startOfMonth, endOfMonth, eachMonthOfInterval, startOfYear, endOfYear, subMonths, startOfDay, endOfDay } from 'date-fns';
+import {
+  format, parse, startOfMonth, endOfMonth, eachMonthOfInterval,
+  startOfYear, endOfYear, startOfDay, endOfDay,
+} from 'date-fns';
+import { CATEGORIES } from '@/lib/constants';
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -23,17 +27,76 @@ export function formatDate(dateStr) {
   return format(new Date(dateStr), 'dd MMM yyyy');
 }
 
-export function getMonthKey(date) {
-  return format(new Date(date), 'yyyy-MM');
+/**
+ * The day of the month a budget period starts on.
+ *
+ * With the default of 1 a period is a calendar month. Set it to 25 and the
+ * period runs the 25th to the 24th, so a salary that lands on the 25th opens
+ * the period it is meant to cover instead of arriving three quarters of the way
+ * through one.
+ *
+ * It is module state because every date helper here needs it and none of them
+ * are React. The store is its only writer — `useStore.subscribe` keeps it in
+ * step — and the helpers that depend on it take it as a defaulted argument, so
+ * a caller that needs to be explicit (see `useMonthFilter`) can be.
+ */
+let cycleStartDay = 1;
+
+/** Clamped to 1–28 so every month actually has the day. */
+export function setCycleStartDay(day) {
+  const n = Math.trunc(Number(day));
+  cycleStartDay = Number.isFinite(n) ? Math.min(Math.max(n, 1), 28) : 1;
+  return cycleStartDay;
 }
 
-export function getYearKey(date) {
+/**
+ * Which period a date falls in, labelled by the month the period *starts* in:
+ * with a start day of 25, everything from 25 Sep to 24 Oct is `2026-09`.
+ *
+ * Shifting back by a constant `startDay - 1` days works for every month length
+ * because the boundary is the same date number each month — which is also why
+ * the start day is capped at 28.
+ */
+export function getMonthKey(date, startDay = cycleStartDay) {
+  const d = new Date(date);
+  if (startDay > 1) d.setDate(d.getDate() - (startDay - 1));
+  return format(d, 'yyyy-MM');
+}
+
+function getYearKey(date) {
   return format(new Date(date), 'yyyy');
 }
 
 export function getMonthRange(monthKey) {
   const date = parse(monthKey, 'yyyy-MM', new Date());
-  return { start: startOfMonth(date), end: endOfMonth(date) };
+  if (cycleStartDay === 1) {
+    return { start: startOfMonth(date), end: endOfMonth(date) };
+  }
+  const y = date.getFullYear();
+  const m = date.getMonth();
+  return {
+    start: startOfDay(new Date(y, m, cycleStartDay)),
+    end: endOfDay(new Date(y, m + 1, cycleStartDay - 1)),
+  };
+}
+
+const DAY_MS = 86_400_000;
+
+/** How many days the period covers — 28 to 31, depending on the months it spans. */
+export function getPeriodDays(monthKey) {
+  const { start, end } = getMonthRange(monthKey);
+  return Math.round((startOfDay(end) - start) / DAY_MS) + 1;
+}
+
+/** 1-based position of `now` inside the period; clamped to the period itself. */
+export function getPeriodDayIndex(monthKey, now = new Date()) {
+  const { start } = getMonthRange(monthKey);
+  const index = Math.floor((startOfDay(now) - start) / DAY_MS) + 1;
+  return Math.min(Math.max(index, 1), getPeriodDays(monthKey));
+}
+
+export function isCurrentPeriod(monthKey, now = new Date()) {
+  return getMonthKey(now) === monthKey;
 }
 
 export function getMonthsInYear(year) {
@@ -42,8 +105,8 @@ export function getMonthsInYear(year) {
   return eachMonthOfInterval({ start, end }).map((d) => format(d, 'yyyy-MM'));
 }
 
-export function filterTransactionsByMonth(transactions, monthKey) {
-  return transactions.filter((t) => getMonthKey(t.date) === monthKey);
+export function filterTransactionsByMonth(transactions, monthKey, startDay = cycleStartDay) {
+  return transactions.filter((t) => getMonthKey(t.date, startDay) === monthKey);
 }
 
 export function filterTransactionsByDateRange(transactions, from, to) {
@@ -56,26 +119,9 @@ export function filterTransactionsByDateRange(transactions, from, to) {
   });
 }
 
-export function getSalaryCycleRange(refDate = new Date()) {
-  const d = new Date(refDate);
-  const day = d.getDate();
-  let from, to;
-  if (day >= 25) {
-    from = new Date(d.getFullYear(), d.getMonth(), 25);
-    to = new Date(d.getFullYear(), d.getMonth() + 1, 24);
-  } else {
-    const prev = subMonths(d, 1);
-    from = new Date(prev.getFullYear(), prev.getMonth(), 25);
-    to = new Date(d.getFullYear(), d.getMonth(), 24);
-  }
-  return { from, to };
-}
-
 export function filterTransactionsByYear(transactions, year) {
   return transactions.filter((t) => getYearKey(t.date) === String(year));
 }
-
-import { CATEGORIES } from '@/lib/constants';
 
 export function calculateTotals(transactions, allCategories = CATEGORIES) {
   let income = 0, expenses = 0, savings = 0, investments = 0, transfers = 0;
@@ -92,14 +138,6 @@ export function calculateTotals(transactions, allCategories = CATEGORIES) {
   return { income, expenses, savings, investments, transfers, net: income - expenses - savings - investments };
 }
 
-export function groupByCategory(transactions) {
-  return transactions.reduce((acc, t) => {
-    if (!acc[t.category]) acc[t.category] = [];
-    acc[t.category].push(t);
-    return acc;
-  }, {});
-}
-
 export function groupBySubcategory(transactions) {
   return transactions.reduce((acc, t) => {
     const key = t.subcategory || 'Uncategorized';
@@ -110,17 +148,19 @@ export function groupBySubcategory(transactions) {
   }, {});
 }
 
-export function groupByAccount(transactions) {
-  return transactions.reduce((acc, t) => {
-    if (!acc[t.account]) acc[t.account] = { items: [], total: 0 };
-    acc[t.account].items.push(t);
-    acc[t.account].total += t.amount;
-    return acc;
-  }, {});
-}
-
-export function getAccountBalance(transactions, accountId, allCategories = CATEGORIES) {
-  let balance = 0;
+/**
+ * An account's balance is its opening balance plus everything that has moved
+ * through it since. The opening balance is what the account already held on the
+ * day it was added — without it the only way to start from a real figure is to
+ * invent an income transaction, which would then distort that month's totals.
+ */
+export function getAccountBalance(
+  transactions,
+  accountId,
+  allCategories = CATEGORIES,
+  openingBalance = 0
+) {
+  let balance = Number(openingBalance) || 0;
   for (const t of transactions) {
     const type = allCategories[t.category]?.type;
     if (type === 'transfer') {

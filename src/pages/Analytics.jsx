@@ -1,230 +1,282 @@
 import { useState, useMemo } from 'react';
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
-} from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import PeriodFilter, { usePeriodFilter } from '@/components/ui/period-filter';
+  Panel, PanelTitle, StackedBar, LegendRow, Meter, SegmentedTabs,
+} from '@/components/ui/design';
+import PageHeader from '@/components/PageHeader';
+import { MonthField } from '@/components/ui/date-fields';
 import useStore from '@/store/useStore';
-import { CATEGORIES, getAllCategories } from '@/lib/constants';
+import { useT, useDateFormat } from '@/hooks/useT';
+import { useMonthFilter } from '@/hooks/useCycle';
+import { getAllCategories } from '@/lib/constants';
+import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
 import {
-  filterTransactionsByMonth, filterTransactionsByYear, calculateTotals,
+  filterTransactionsByYear, calculateTotals,
   formatCurrency, groupBySubcategory, getMonthsInYear, cn,
+  getMonthKey,
 } from '@/lib/utils';
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-export default function Analytics() {
-  const { transactions, customCategories } = useStore();
-  const period = usePeriodFilter(transactions);
-  const [view, setView] = useState('monthly');
-  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
-
-  const year = parseInt(period.currentMonth.split('-')[0]);
-  const activeTx = useMemo(
-    () => view === 'yearly' && period.mode === 'month' ? filterTransactionsByYear(transactions, year) : period.filtered,
-    [transactions, period.filtered, period.mode, year, view]
-  );
-  const totals = useMemo(() => calculateTotals(activeTx, allCategories), [activeTx, allCategories]);
-
-  const pieData = useMemo(() =>
-    Object.entries(allCategories)
-      .filter(([, cat]) => cat.type !== 'transfer')
-      .map(([key, cat]) => ({
-        name: cat.label,
-        value: activeTx.filter((t) => t.category === key).reduce((s, t) => s + t.amount, 0),
-        fill: cat.hex,
-      }))
-      .filter((d) => d.value > 0),
-  [activeTx, allCategories]);
-
-  const subData = useMemo(() => {
-    const expTx = activeTx.filter((t) => {
-      const type = allCategories[t.category]?.type;
-      return type === 'expense';
-    });
-    const chartVars = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-5)', 'var(--chart-3)', 'var(--chart-4)'];
-    return Object.entries(groupBySubcategory(expTx))
-      .sort((a, b) => b[1].total - a[1].total)
-      .map(([name, data], i) => ({ name, value: data.total, fill: chartVars[i % chartVars.length] }));
-  }, [activeTx, allCategories]);
-
-  const monthlyComparison = useMemo(() =>
-    getMonthsInYear(year).map((mk) => {
-      const mTx = filterTransactionsByMonth(transactions, mk);
-      const mt = calculateTotals(mTx, allCategories);
-      return {
-        month: MONTHS_SHORT[parseInt(mk.split('-')[1]) - 1],
-        Income: mt.income,
-        Bills: mTx.filter((t) => t.category === 'bills').reduce((s, t) => s + t.amount, 0),
-        Expenses: mTx.filter((t) => t.category === 'expenses').reduce((s, t) => s + t.amount, 0),
-        Savings: mt.savings,
-        Investments: mt.investments,
-      };
-    }),
-  [transactions, year, allCategories]);
-
-  const radarData = useMemo(() =>
-    Object.entries(allCategories)
-      .filter(([, cat]) => cat.type !== 'income' && cat.type !== 'transfer')
-      .map(([key, cat]) => ({
-        category: cat.label,
-        amount: activeTx.filter((t) => t.category === key).reduce((s, t) => s + t.amount, 0),
-      })),
-  [activeTx, allCategories]);
-
-  const expenseTx = useMemo(() => activeTx.filter((t) => {
-    const type = allCategories[t.category]?.type;
-    return type === 'expense';
-  }), [activeTx, allCategories]);
-
-  const pieConfig = useMemo(() => Object.fromEntries(pieData.map((d) => [d.name, { label: d.name, color: d.fill }])), [pieData]);
-  const barConfig = { Income: { color: 'var(--chart-1)' }, Bills: { color: 'var(--chart-2)' }, Expenses: { color: 'var(--chart-5)' }, Savings: { color: 'var(--chart-3)' }, Investments: { color: 'var(--chart-4)' } };
-  const subBarConfig = useMemo(() => Object.fromEntries(subData.map((d) => [d.name, { label: d.name, color: d.fill }])), [subData]);
-  const radarConfig = { amount: { label: 'Amount', color: 'var(--chart-1)' } };
+/** Grouped vertical bars — the design's "Monthly Comparison" panel. */
+function ComparisonBars({ months, t }) {
+  const max = Math.max(...months.flatMap((m) => [m.income, m.expenses, m.savings]), 1);
+  const series = [
+    { key: 'income', color: 'var(--chart-1)', label: t('transactions.income') },
+    { key: 'expenses', color: 'var(--chart-2)', label: t('transactions.expenses') },
+    { key: 'savings', color: 'var(--chart-4)', label: t('categoriesData.savings') },
+  ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold">Analytics</h2>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Deep dive into your spending patterns</p>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          {period.mode === 'month' && (
-            <Tabs value={view} onValueChange={setView}>
-              <TabsList>
-                <TabsTrigger value="monthly" className="text-xs sm:text-sm">Monthly</TabsTrigger>
-                <TabsTrigger value="yearly" className="text-xs sm:text-sm">Yearly</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          )}
-          <PeriodFilter {...period} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-        {[
-          { label: 'Income', val: totals.income, color: 'text-chart-1' },
-          { label: 'Outflow', val: totals.expenses + totals.savings + totals.investments, color: 'text-destructive' },
-          { label: 'Savings Rate', val: totals.income > 0 ? Math.round((totals.savings / totals.income) * 100) : 0, isPct: true, color: 'text-chart-3' },
-          { label: 'Net', val: totals.net, color: totals.net >= 0 ? 'text-chart-1' : 'text-destructive' },
-        ].map(({ label, val, color, isPct }) => (
-          <Card key={label}>
-            <CardContent className="p-3 sm:pt-5">
-              <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider mb-0.5 sm:mb-1">{label}</p>
-              <p className={cn('text-base sm:text-xl font-bold truncate', color)}>{isPct ? `${val}%` : formatCurrency(val)}</p>
-            </CardContent>
-          </Card>
+    <>
+      <div className="flex h-[150px] items-end gap-3 px-2 sm:gap-5">
+        {months.map((m) => (
+          <div key={m.label} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
+            <div className="flex h-full items-end gap-[3px]">
+              {series.map((s) => (
+                <div
+                  key={s.key}
+                  title={`${s.label}: ${formatCurrency(m[s.key])}`}
+                  style={{
+                    width: 10,
+                    height: `${Math.max((m[s.key] / max) * 100, 2)}%`,
+                    borderRadius: '5px 5px 2px 2px',
+                    background: `linear-gradient(180deg, color-mix(in oklch, ${s.color} 80%, white), ${s.color})`,
+                  }}
+                />
+              ))}
+            </div>
+            <span className="text-[11px] text-muted-foreground">{m.label}</span>
+          </div>
         ))}
       </div>
+      <div className="mt-3.5 flex flex-wrap gap-4 text-[11.5px] text-muted-foreground">
+        {series.map((s) => (
+          <span key={s.key} className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full" style={{ background: s.color }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Category Distribution</CardTitle></CardHeader>
-          <CardContent>
-            {pieData.length > 0 ? (
+export default function Analytics() {
+  const t = useT();
+  const dates = useDateFormat();
+  const [view, setView] = useState('monthly');
+  const [month, setMonth] = useState(() => getMonthKey(new Date()));
+  const filterByMonth = useMonthFilter();
+
+  const transactions = useStore((s) => s.transactions);
+  const customCategories = useStore((s) => s.customCategories);
+  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
+
+  const year = Number(month.slice(0, 4));
+  const activeTx = useMemo(
+    () => (view === 'yearly'
+      ? filterTransactionsByYear(transactions, year)
+      : filterByMonth(transactions, month)),
+    [filterByMonth, transactions, view, year, month]
+  );
+  const totals = useMemo(() => calculateTotals(activeTx, allCategories), [activeTx, allCategories]);
+  const outflow = totals.expenses + totals.savings + totals.investments;
+
+  const distribution = useMemo(() => {
+    const rows = Object.entries(allCategories)
+      .filter(([, c]) => c.type !== 'transfer')
+      .map(([key, c]) => ({
+        key,
+        label: categoryLabel(c, t),
+        color: c.hex,
+        value: activeTx.filter((x) => x.category === key).reduce((s, x) => s + x.amount, 0),
+      }))
+      .filter((r) => r.value > 0)
+      .sort((a, b) => b.value - a.value);
+    return { rows, total: rows.reduce((s, r) => s + r.value, 0) };
+  }, [activeTx, allCategories, t]);
+
+  const expenseBars = useMemo(() => {
+    const expTx = activeTx.filter((x) => allCategories[x.category]?.type === 'expense');
+    const rows = Object.entries(groupBySubcategory(expTx))
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 6);
+    const max = rows[0]?.[1].total || 1;
+    const palette = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
+    return rows.map(([name, data], i) => ({
+      label: subcategoryLabel(name, t),
+      value: data.total,
+      pct: Math.round((data.total / max) * 100),
+      color: palette[i % palette.length],
+    }));
+  }, [activeTx, allCategories, t]);
+
+  const comparison = useMemo(
+    () => getMonthsInYear(year).map((mk) => {
+      const mt = calculateTotals(filterByMonth(transactions, mk), allCategories);
+      return {
+        label: dates.monthShort(`${mk}-01`).split(' ')[0],
+        income: mt.income,
+        expenses: mt.expenses,
+        savings: mt.savings,
+      };
+    }).filter((m) => m.income + m.expenses + m.savings > 0),
+    [filterByMonth, transactions, year, allCategories, dates]
+  );
+
+  const categoryMix = useMemo(() => {
+    if (totals.income <= 0) return [];
+    return [
+      { label: t('categoriesData.bills'), value: activeTx.filter((x) => x.category === 'bills').reduce((s, x) => s + x.amount, 0), color: 'var(--amber)' },
+      { label: t('categoriesData.expenses'), value: totals.expenses, color: 'var(--danger)' },
+      { label: t('categoriesData.savings'), value: totals.savings, color: 'var(--teal)' },
+      { label: t('categoriesData.investments'), value: totals.investments, color: 'var(--violet)' },
+    ].map((c) => ({ ...c, pct: Math.round((c.value / totals.income) * 100) }));
+  }, [activeTx, totals, t]);
+
+  const expenseTx = activeTx.filter((x) => allCategories[x.category]?.type === 'expense');
+  const savingsRate = totals.income > 0 ? Math.round((totals.savings / totals.income) * 100) : 0;
+  const investmentRate = totals.income > 0 ? Math.round((totals.investments / totals.income) * 100) : 0;
+
+  const quickStats = [
+    { label: t('analytics.totalTransactions'), value: String(activeTx.length) },
+    {
+      label: t('analytics.avgTransaction'),
+      value: formatCurrency(activeTx.length ? activeTx.reduce((s, x) => s + x.amount, 0) / activeTx.length : 0),
+    },
+    {
+      label: t('analytics.largestExpense'),
+      value: formatCurrency(expenseTx.length ? Math.max(...expenseTx.map((x) => x.amount)) : 0),
+      className: 'text-danger',
+    },
+    { label: t('reports.savingsRate'), value: `${savingsRate}%`, className: 'text-teal' },
+    { label: t('analytics.investmentRate'), value: `${investmentRate}%`, className: 'text-violet' },
+  ];
+
+  const stats = [
+    { label: t('transactions.income'), value: formatCurrency(totals.income), className: 'text-primary' },
+    { label: t('reports.outflow'), value: formatCurrency(outflow), className: 'text-danger' },
+    { label: t('reports.savingsRate'), value: `${savingsRate}%`, className: 'text-teal' },
+    { label: t('reports.net'), value: formatCurrency(totals.net), className: totals.net >= 0 ? 'text-primary' : 'text-danger' },
+  ];
+
+  return (
+    <>
+      <PageHeader
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedTabs
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'monthly', label: t('reports.monthly') },
+                { value: 'yearly', label: t('reports.yearly') },
+              ]}
+            />
+            <MonthField value={month} onChange={setMonth} />
+          </div>
+        }
+      />
+
+      <div className="flex flex-col gap-4">
+        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+          {stats.map((s) => (
+            <div key={s.label} className="rounded-2xl border border-border bg-card p-4">
+              <div className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground">{s.label}</div>
+              <div className={cn('mt-1 text-[19px] font-extrabold tabular-nums truncate', s.className)}>
+                {s.value}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Panel>
+            <PanelTitle trailing={formatCurrency(distribution.total)}>
+              {t('analytics.distribution')}
+            </PanelTitle>
+            {distribution.rows.length > 0 ? (
               <>
-                <ChartContainer config={pieConfig} className="mx-auto aspect-square max-h-[200px] sm:max-h-[250px]">
-                  <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
-                    <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
-                      {pieData.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                    </Pie>
-                  </PieChart>
-                </ChartContainer>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {pieData.map((d, i) => (
-                    <div key={i} className="flex items-center gap-1.5">
-                      <div className="size-2 rounded-full" style={{ backgroundColor: d.fill }} />
-                      <span className="text-xs text-muted-foreground">{d.name}: {formatCurrency(d.value)}</span>
-                    </div>
+                <StackedBar segments={distribution.rows} />
+                <div className="mt-4 flex flex-col gap-2.5">
+                  {distribution.rows.map((r) => (
+                    <LegendRow
+                      key={r.key} color={r.color} label={r.label}
+                      value={formatCurrency(r.value)}
+                      pct={Math.round((r.value / distribution.total) * 100)}
+                    />
                   ))}
                 </div>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-16">No data available</p>
+              <p className="py-14 text-center text-sm text-muted-foreground">{t('reports.noExpenses')}</p>
             )}
-          </CardContent>
-        </Card>
+          </Panel>
 
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Expense Breakdown</CardTitle></CardHeader>
-          <CardContent>
-            {subData.length > 0 ? (
-              <ChartContainer config={subBarConfig} className="h-[250px] sm:h-[280px] w-full">
-                <BarChart data={subData} layout="vertical" margin={{ left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <YAxis dataKey="name" type="category" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} width={80} />
-                  <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                    {subData.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
+          <Panel>
+            <PanelTitle>{t('analytics.expenseBreakdown')}</PanelTitle>
+            {expenseBars.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {expenseBars.map((b) => (
+                  <div key={b.label}>
+                    <div className="mb-1 flex justify-between text-[12.5px]">
+                      <span>{b.label}</span>
+                      <span className="text-muted-foreground tabular-nums">{formatCurrency(b.value)}</span>
+                    </div>
+                    <Meter pct={b.pct} color={b.color} height={8} />
+                  </div>
+                ))}
+              </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-16">No expenses recorded</p>
+              <p className="py-14 text-center text-sm text-muted-foreground">{t('reports.noSpending')}</p>
             )}
-          </CardContent>
-        </Card>
+          </Panel>
 
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Monthly Comparison ({year})</CardTitle></CardHeader>
-          <CardContent>
-            <ChartContainer config={barConfig} className="h-[250px] sm:h-[280px] w-full">
-              <BarChart data={monthlyComparison}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} interval={0} />
-                <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(0)}M` : `${(v / 1e3).toFixed(0)}k`} width={40} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
-                <Bar dataKey="Income" fill="var(--chart-1)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Bills" fill="var(--chart-2)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Expenses" fill="var(--chart-5)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Savings" fill="var(--chart-3)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Investments" fill="var(--chart-4)" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
+          <Panel className="xl:col-span-2">
+            <PanelTitle>{t('analytics.monthlyComparison')}</PanelTitle>
+            {comparison.length > 0 ? (
+              <ComparisonBars months={comparison} t={t} />
+            ) : (
+              <p className="py-14 text-center text-sm text-muted-foreground">{t('reports.noExpenses')}</p>
+            )}
+          </Panel>
 
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Spending Radar</CardTitle></CardHeader>
-          <CardContent>
-            <ChartContainer config={radarConfig} className="mx-auto aspect-square max-h-[200px] sm:max-h-[250px]">
-              <RadarChart data={radarData}>
-                <PolarGrid stroke="var(--border)" />
-                <PolarAngleAxis dataKey="category" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} />
-                <PolarRadiusAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} />
-                <Radar name="Amount" dataKey="amount" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.3} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
-              </RadarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
+          <Panel>
+            <PanelTitle>{t('analytics.categoryMix')}</PanelTitle>
+            {categoryMix.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {categoryMix.map((c) => (
+                  <div key={c.label}>
+                    <div className="mb-1 flex justify-between text-[12.5px]">
+                      <span>{c.label}</span>
+                      <span className="text-muted-foreground tabular-nums">{c.pct}%</span>
+                    </div>
+                    <Meter pct={c.pct} color={c.color} height={8} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="py-14 text-center text-sm text-muted-foreground">{t('reports.noExpenses')}</p>
+            )}
+          </Panel>
 
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Quick Stats</CardTitle></CardHeader>
-          <CardContent>
-            <div className="flex flex-col gap-4">
-              {[
-                { label: 'Total Transactions', value: String(activeTx.length) },
-                { label: 'Avg. Transaction', value: activeTx.length > 0 ? formatCurrency(activeTx.reduce((s, t) => s + t.amount, 0) / activeTx.length) : formatCurrency(0) },
-                { label: 'Largest Expense', value: expenseTx.length > 0 ? formatCurrency(Math.max(...expenseTx.map((t) => t.amount))) : formatCurrency(0), color: 'text-destructive' },
-                { label: 'Savings Rate', value: `${totals.income > 0 ? Math.round((totals.savings / totals.income) * 100) : 0}%`, color: 'text-chart-3' },
-                { label: 'Investment Rate', value: `${totals.income > 0 ? Math.round((totals.investments / totals.income) * 100) : 0}%`, color: 'text-chart-1' },
-              ].map(({ label, value, color }, i, arr) => (
-                <div key={label} className={cn('flex justify-between items-center', i < arr.length - 1 && 'pb-3 border-b border-border/50')}>
-                  <span className="text-sm text-muted-foreground">{label}</span>
-                  <span className={cn('text-sm font-bold', color)}>{value}</span>
+          <Panel>
+            <PanelTitle>{t('analytics.quickStats')}</PanelTitle>
+            <div className="flex flex-col gap-2.5">
+              {quickStats.map((q, i) => (
+                <div
+                  key={q.label}
+                  className={cn(
+                    'flex justify-between pb-2.5 text-[13px]',
+                    i < quickStats.length - 1 && 'border-b border-border'
+                  )}
+                >
+                  <span className="text-muted-foreground">{q.label}</span>
+                  <span className={cn('font-bold tabular-nums', q.className)}>{q.value}</span>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </Panel>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

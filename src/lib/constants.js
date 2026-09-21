@@ -6,26 +6,31 @@ export const CATEGORY_TYPES = {
   transfer: 'Transfer',
 };
 
+// `labelKey` resolves through i18n; `label` is the untranslated fallback and
+// the value user-created categories carry instead. See `categoryLabel()`.
 export const CATEGORIES = {
   income: {
     label: 'Income',
+    labelKey: 'categoriesData.income',
     type: 'income',
-    color: 'var(--chart-1)',
-    hex: '#6b7d4a',
+    color: 'var(--primary)',
+    hex: '#00863b',
     subcategories: ['Freelance', 'Paycheck', 'Dividends', 'Other'],
   },
   bills: {
+    labelKey: 'categoriesData.bills',
     label: 'Bills',
     type: 'expense',
-    color: 'var(--chart-2)',
-    hex: '#d47d52',
+    color: 'var(--amber)',
+    hex: '#bc5800',
     subcategories: ['Kos', 'Insurance', 'Subscriptions', 'Phones & Internet', 'Other'],
   },
   expenses: {
+    labelKey: 'categoriesData.expenses',
     label: 'Expenses',
     type: 'expense',
-    color: 'var(--chart-5)',
-    hex: '#bf6438',
+    color: 'var(--danger)',
+    hex: '#cc2635',
     subcategories: [
       'Groceries',
       'Transportation',
@@ -39,32 +44,30 @@ export const CATEGORIES = {
     ],
   },
   savings: {
+    labelKey: 'categoriesData.savings',
     label: 'Savings',
     type: 'savings',
-    color: 'var(--chart-3)',
-    hex: '#506180',
+    color: 'var(--teal)',
+    hex: '#007b7e',
     subcategories: ['Emergency Fund', 'Goal Savings', 'General Savings', 'Other'],
   },
   investments: {
+    labelKey: 'categoriesData.investments',
     label: 'Investments',
     type: 'investment',
-    color: 'var(--chart-4)',
-    hex: '#9070ad',
+    color: 'var(--violet)',
+    hex: '#8347cf',
     subcategories: ['Reksa Dana', 'Stock', 'Cryptocurrency', 'Other'],
   },
   transfer: {
+    labelKey: 'categoriesData.transfer',
     label: 'Transfer',
     type: 'transfer',
     color: 'var(--muted-foreground)',
-    hex: '#9c8c74',
+    hex: '#5f656c',
     subcategories: ['Account Transfer'],
   },
 };
-
-export const CATEGORY_LIST = Object.entries(CATEGORIES).map(([key, val]) => ({
-  id: key,
-  ...val,
-}));
 
 export function getAllCategories(customCategories = {}) {
   return { ...CATEGORIES, ...customCategories };
@@ -78,14 +81,14 @@ export function getAllCategoryList(customCategories = {}) {
 }
 
 export const ACCOUNT_COLORS = [
-  '#6b7d4a', '#d47d52', '#506180', '#9070ad', '#bf6438',
-  '#8a9f62', '#9c8c74', '#755691', '#687a9a', '#b8a992',
+  '#00863b', '#007b7e', '#8347cf', '#bc5800', '#cc2635',
+  '#2f9e6b', '#3f9ca0', '#9b6fdb', '#d07a2e', '#5f656c',
 ];
 
 export const CATEGORY_COLORS = [
-  '#6b7d4a', '#d47d52', '#bf6438', '#506180', '#9070ad',
-  '#9c8c74', '#8a9f62', '#755691', '#687a9a', '#b8a992',
-  '#e07c5a', '#5a8f7b', '#7c6ea0', '#a89060', '#6a8cad',
+  '#00863b', '#cc2635', '#bc5800', '#007b7e', '#8347cf',
+  '#2f9e6b', '#d4484f', '#d07a2e', '#3f9ca0', '#9b6fdb',
+  '#5f656c', '#1f7a5c', '#a8323e', '#8a5a18', '#6a4fa8',
 ];
 
 export function getSubcategories(categoryKey, customSubcategories = {}, customCategories = {}) {

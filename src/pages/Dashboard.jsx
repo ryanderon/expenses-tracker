@@ -1,254 +1,294 @@
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { TrendingUp, TrendingDown, PiggyBank, DollarSign, Landmark, Plus } from 'lucide-react';
+import { useMemo, useState, lazy, Suspense } from 'react';
+import { Link } from 'react-router-dom';
+// Recharts is ~400 kB; the dashboard paints without waiting for it.
+const TrendChart = lazy(() => import('@/components/TrendChart'));
 import {
-  PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid,
-} from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+  Panel, PanelTitle, StatCard, StackedBar, LegendRow, Meter, Ring,
+  InitialBadge, Icon, EmptyState,
+} from '@/components/ui/design';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import PeriodFilter, { usePeriodFilter } from '@/components/ui/period-filter';
+import PageHeader from '@/components/PageHeader';
+import { MonthField } from '@/components/ui/date-fields';
 import useStore from '@/store/useStore';
-import { CATEGORIES, getAllCategories } from '@/lib/constants';
+import { useT, useDateFormat } from '@/hooks/useT';
+import { useMonthFilter } from '@/hooks/useCycle';
+import { getAllCategories } from '@/lib/constants';
+import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
 import {
-  filterTransactionsByMonth, calculateTotals, formatCurrency,
+  calculateTotals, formatCurrency,
   groupBySubcategory, getMonthsInYear, getAccountBalance, cn,
+  getMonthKey,
 } from '@/lib/utils';
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+import QuickAdd from '@/components/QuickAdd';
 
 export default function Dashboard() {
-  const { transactions, accounts, customCategories } = useStore();
-  const navigate = useNavigate();
-  const period = usePeriodFilter(transactions);
-  const { filtered: monthTx, currentMonth } = period;
+  const t = useT();
+  const dates = useDateFormat();
+  const [month, setMonth] = useState(() => getMonthKey(new Date()));
+  // Month keys are derived from the cycle start day, so a change to it has to
+  // invalidate every memo that filters by month.
+  const filterByMonth = useMonthFilter();
+  const [addOpen, setAddOpen] = useState(false);
+
+  const transactions = useStore((s) => s.transactions);
+  const accounts = useStore((s) => s.accounts);
+  const customCategories = useStore((s) => s.customCategories);
+
   const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
+  const monthTx = useMemo(
+    () => filterByMonth(transactions, month),
+    [filterByMonth, transactions, month]
+  );
   const totals = useMemo(() => calculateTotals(monthTx, allCategories), [monthTx, allCategories]);
 
-  const categoryData = useMemo(() =>
-    Object.entries(allCategories)
-      .filter(([, cat]) => cat.type !== 'income' && cat.type !== 'transfer')
-      .map(([key, cat]) => ({
-        name: cat.label,
-        value: monthTx.filter((t) => t.category === key).reduce((s, t) => s + t.amount, 0),
-        fill: cat.hex,
+  const outflow = totals.expenses + totals.savings + totals.investments;
+
+  // --- Spending breakdown: every non-income category with a value ----------
+  const breakdown = useMemo(() => {
+    const rows = Object.entries(allCategories)
+      .filter(([, c]) => c.type !== 'income' && c.type !== 'transfer')
+      .map(([key, c]) => ({
+        key,
+        label: categoryLabel(c, t),
+        color: c.hex,
+        value: monthTx.filter((x) => x.category === key).reduce((s, x) => s + x.amount, 0),
       }))
-      .filter((d) => d.value > 0),
-  [monthTx, allCategories]);
+      .filter((r) => r.value > 0)
+      .sort((a, b) => b.value - a.value);
+    const total = rows.reduce((s, r) => s + r.value, 0);
+    return { rows, total };
+  }, [monthTx, allCategories, t]);
 
-  const accountBalances = useMemo(() =>
-    accounts.map((acc) => ({ ...acc, balance: getAccountBalance(transactions, acc.id, allCategories) })),
-  [transactions, accounts, allCategories]);
-
-  const year = currentMonth.split('-')[0];
-  const trendData = useMemo(() =>
-    getMonthsInYear(parseInt(year)).map((mk) => {
-      const mTx = filterTransactionsByMonth(transactions, mk);
-      const mt = calculateTotals(mTx, allCategories);
-      return { month: MONTHS_SHORT[parseInt(mk.split('-')[1]) - 1], Income: mt.income, Expenses: mt.expenses };
-    }),
-  [transactions, year, allCategories]);
-
+  // --- Top spending subcategories ----------------------------------------
   const topSpending = useMemo(() => {
-    const expTx = monthTx.filter((t) => {
-      const type = allCategories[t.category]?.type;
-      return type === 'expense';
-    });
-    return Object.entries(groupBySubcategory(expTx))
+    const expTx = monthTx.filter((x) => allCategories[x.category]?.type === 'expense');
+    const rows = Object.entries(groupBySubcategory(expTx))
       .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 5);
-  }, [monthTx, allCategories]);
+    const max = rows[0]?.[1].total || 1;
+    const palette = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
+    return rows.map(([name, data], i) => ({
+      label: subcategoryLabel(name, t),
+      value: data.total,
+      pct: Math.round((data.total / max) * 100),
+      color: palette[i % palette.length],
+    }));
+  }, [monthTx, allCategories, t]);
 
-  const pieConfig = useMemo(() => Object.fromEntries(categoryData.map((d) => [d.name, { label: d.name, color: d.fill }])), [categoryData]);
-  const areaConfig = { Income: { color: 'var(--chart-1)' }, Expenses: { color: 'var(--chart-2)' } };
+  // --- Allocation rings ---------------------------------------------------
+  const allocation = useMemo(() => ([
+    { key: 'expenses', label: t('transactions.expenses'), value: totals.expenses, color: 'var(--danger)' },
+    { key: 'savings', label: t('categoriesData.savings'), value: totals.savings, color: 'var(--teal)' },
+    { key: 'investments', label: t('categoriesData.investments'), value: totals.investments, color: 'var(--violet)' },
+  ].map((a) => ({
+    ...a,
+    pct: totals.income > 0 ? Math.round((a.value / totals.income) * 100) : 0,
+  }))), [totals, t]);
+
+  // --- Year trend ---------------------------------------------------------
+  const year = Number(month.slice(0, 4));
+  const trend = useMemo(
+    () => getMonthsInYear(year).map((mk) => {
+      const mt = calculateTotals(filterByMonth(transactions, mk), allCategories);
+      return {
+        month: dates.monthShort(`${mk}-01`).split(' ')[0],
+        income: mt.income,
+        expenses: mt.expenses + mt.savings + mt.investments,
+      };
+    }),
+    [filterByMonth, transactions, year, allCategories, dates]
+  );
+
+  const balances = useMemo(
+    () => accounts.map((a) => ({
+      ...a,
+      balance: getAccountBalance(transactions, a.id, allCategories, a.openingBalance),
+    })),
+    [accounts, transactions, allCategories]
+  );
+
+  const hasData = transactions.length > 0;
+  const chartConfig = {
+    income: { label: t('transactions.income'), color: 'var(--chart-1)' },
+    expenses: { label: t('reports.outflow'), color: 'var(--chart-2)' },
+  };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold">Dashboard</h2>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Your financial overview at a glance</p>
+    <>
+      <PageHeader actions={<MonthField value={month} onChange={setMonth} />} />
+
+      <div className="flex flex-col gap-5">
+        {/* Hero */}
+        <div
+          data-tour="stat-cards"
+          className="flex flex-wrap items-center justify-between gap-5 rounded-3xl bg-gradient-to-br from-primary to-[var(--teal)] px-6 py-7 text-primary-foreground shadow-[0_12px_28px_var(--primary-soft)] sm:px-8"
+        >
+          <div>
+            <div className="text-[13px] tracking-[0.03em] opacity-85">
+              {t('dashboard.netBalance')}
+            </div>
+            <div className="mt-1 text-[32px] font-extrabold tracking-[-0.02em] tabular-nums sm:text-[38px]">
+              {formatCurrency(totals.net)}
+            </div>
+          </div>
+          <div className="flex gap-6">
+            <div>
+              <div className="text-xs opacity-80">{t('transactions.income')}</div>
+              <div className="text-[17px] font-bold tabular-nums">{formatCurrency(totals.income)}</div>
+            </div>
+            <div>
+              <div className="text-xs opacity-80">{t('reports.outflow')}</div>
+              <div className="text-[17px] font-bold tabular-nums">{formatCurrency(outflow)}</div>
+            </div>
+          </div>
         </div>
-        <div data-tour="month-picker" className="self-start sm:self-auto"><PeriodFilter {...period} /></div>
-      </div>
 
-      <div data-tour="stat-cards" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
-        {[
-          { label: 'Income', value: totals.income, color: 'text-chart-1', icon: TrendingUp, bg: 'bg-chart-1/15' },
-          { label: 'Expenses', value: totals.expenses, color: 'text-destructive', icon: TrendingDown, bg: 'bg-destructive/15' },
-          { label: 'Savings', value: totals.savings, color: 'text-chart-3', icon: PiggyBank, bg: 'bg-chart-3/15' },
-          { label: 'Investments', value: totals.investments, color: 'text-chart-4', icon: Landmark, bg: 'bg-chart-4/15' },
-          { label: 'Net Balance', value: totals.net, color: totals.net >= 0 ? 'text-chart-1' : 'text-destructive', icon: DollarSign, bg: 'bg-muted' },
-        ].map(({ label, value, color, icon: Icon, bg }) => (
-          <Card key={label} className={label === 'Net Balance' ? 'col-span-2 sm:col-span-1' : ''}>
-            <CardContent className="p-3 sm:pt-4 sm:pb-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className={cn('size-8 sm:size-9 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0', bg)}>
-                  <Icon className={color} />
+        {/* Stats */}
+        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label={t('transactions.income')} value={formatCurrency(totals.income)}
+            icon="trending_up" tone="primary" valueClass="text-primary"
+          />
+          <StatCard
+            label={t('transactions.expenses')} value={formatCurrency(totals.expenses)}
+            icon="trending_down" tone="danger" valueClass="text-danger"
+          />
+          <StatCard
+            label={t('categoriesData.savings')} value={formatCurrency(totals.savings)}
+            icon="savings" tone="teal" valueClass="text-teal"
+          />
+          <StatCard
+            label={t('categoriesData.investments')} value={formatCurrency(totals.investments)}
+            icon="account_balance" tone="violet" valueClass="text-violet"
+          />
+        </div>
+
+        {!hasData && (
+          <EmptyState
+            icon="receipt_long"
+            title={t('transactions.emptyTitle')}
+            body={t('transactions.emptyBody')}
+            action={
+              <Button size="sm" onClick={() => setAddOpen(true)}>
+                <Icon name="add" size={18} /> {t('transactions.add')}
+              </Button>
+            }
+          />
+        )}
+
+        {/* Allocation */}
+        {totals.income > 0 && (
+          <Panel>
+            <PanelTitle>{t('reports.allocation')}</PanelTitle>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              {allocation.map((a) => (
+                <div key={a.key}>
+                  <Ring pct={a.pct} color={a.color} label={`${a.pct}%`} />
+                  <div className="mt-2 text-xs text-muted-foreground">{a.label}</div>
+                  <div className="mt-px text-xs font-semibold tabular-nums">{formatCurrency(a.value)}</div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wider leading-tight">{label}</p>
-                  <p className={cn('text-sm sm:text-lg font-bold tabular-nums truncate', color)}>{formatCurrency(value)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {monthTx.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-              <Plus className="text-primary" />
+              ))}
             </div>
-            <h3 className="text-base font-semibold mb-1">No transactions yet</h3>
-            <p className="text-sm text-muted-foreground mb-4 max-w-xs">
-              Start tracking your finances by adding your first transaction for this month.
-            </p>
-            <Button onClick={() => navigate('/transactions')} className="gap-1.5">
-              <Plus data-icon="inline-start" /> Add Transaction
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+          </Panel>
+        )}
 
-      {totals.income > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Allocation of Income</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              {[
-                { label: 'Expenses', val: totals.expenses, color: 'var(--chart-2)' },
-                { label: 'Savings', val: totals.savings, color: 'var(--chart-3)' },
-                { label: 'Investments', val: totals.investments, color: 'var(--chart-4)' },
-              ].map(({ label, val, color }) => {
-                const p = Math.round((val / totals.income) * 100);
-                return (
-                  <div key={label} className="text-center">
-                    <div className="relative size-12 sm:size-16 mx-auto mb-1.5 sm:mb-2">
-                      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--secondary)" strokeWidth="3" />
-                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={color} strokeWidth="3" strokeDasharray={`${p}, 100`} className="transition-all duration-700 ease-out" />
-                      </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-[10px] sm:text-xs font-bold">{p}%</span>
-                    </div>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">{label}</p>
-                    <p className="text-[10px] sm:text-xs font-medium mt-0.5">{formatCurrency(val)}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div data-tour="charts" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Spending Breakdown</CardTitle></CardHeader>
-          <CardContent>
-            {categoryData.length > 0 ? (
+        {/* Breakdown + top spending */}
+        <div data-tour="charts" className="grid gap-4 xl:grid-cols-2">
+          <Panel>
+            <PanelTitle trailing={formatCurrency(breakdown.total)}>
+              {t('reports.breakdown')}
+            </PanelTitle>
+            {breakdown.rows.length > 0 ? (
               <>
-                <ChartContainer config={pieConfig} className="mx-auto aspect-square max-h-[200px] sm:max-h-[250px]">
-                  <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
-                    <Pie data={categoryData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
-                      {categoryData.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                    </Pie>
-                  </PieChart>
-                </ChartContainer>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {categoryData.map((d, i) => (
-                    <div key={i} className="flex items-center gap-1.5">
-                      <div className="size-2 rounded-full" style={{ backgroundColor: d.fill }} />
-                      <span className="text-xs text-muted-foreground">{d.name}</span>
-                    </div>
+                <StackedBar segments={breakdown.rows} />
+                <div className="mt-4 flex flex-col gap-2.5">
+                  {breakdown.rows.map((r) => (
+                    <LegendRow
+                      key={r.key}
+                      color={r.color}
+                      label={r.label}
+                      value={formatCurrency(r.value)}
+                      pct={Math.round((r.value / breakdown.total) * 100)}
+                    />
                   ))}
                 </div>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-16">No expenses this month</p>
+              <p className="py-14 text-center text-sm text-muted-foreground">{t('reports.noExpenses')}</p>
             )}
-          </CardContent>
-        </Card>
+          </Panel>
 
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Top Spending</CardTitle></CardHeader>
-          <CardContent>
+          <Panel>
+            <PanelTitle>{t('reports.topSpending')}</PanelTitle>
             {topSpending.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                {topSpending.map(([name, data], i) => {
-                  const maxVal = topSpending[0][1].total;
-                  const pctVal = Math.round((data.total / maxVal) * 100);
-                  return (
-                    <div key={name}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>{name}</span>
-                        <span className="text-muted-foreground tabular-nums">{formatCurrency(data.total)}</span>
-                      </div>
-                      <Progress value={pctVal} className="h-2" style={{ '--progress-color': `var(--chart-${(i % 5) + 1})` }} />
+              <div className="flex flex-col gap-3.5">
+                {topSpending.map((s) => (
+                  <div key={s.label}>
+                    <div className="mb-1.5 flex justify-between text-[13px]">
+                      <span>{s.label}</span>
+                      <span className="font-semibold text-muted-foreground tabular-nums">
+                        {formatCurrency(s.value)}
+                      </span>
                     </div>
-                  );
-                })}
+                    <Meter pct={s.pct} color={s.color} />
+                  </div>
+                ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-16">No spending this month</p>
+              <p className="py-14 text-center text-sm text-muted-foreground">{t('reports.noSpending')}</p>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </Panel>
+        </div>
 
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Monthly Trend ({year})</CardTitle></CardHeader>
-        <CardContent className="px-2 sm:px-6">
-          <ChartContainer config={areaConfig} className="h-[220px] sm:h-[280px] w-full">
-            <AreaChart data={trendData}>
-              <defs>
-                <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--chart-2)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="month" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} axisLine={false} interval={0} />
-              <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} axisLine={false} tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(0)}M` : `${(v / 1e3).toFixed(0)}k`} width={40} />
-              <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value)} />} />
-              <Area type="monotone" dataKey="Income" stroke="var(--chart-1)" fill="url(#incomeGrad)" strokeWidth={2} />
-              <Area type="monotone" dataKey="Expenses" stroke="var(--chart-2)" fill="url(#expenseGrad)" strokeWidth={2} />
-            </AreaChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+        {/* Trend */}
+        <Panel>
+          <PanelTitle>{t('reports.monthlyTrend', { year })}</PanelTitle>
+          <Suspense fallback={<div className="h-[210px] sm:h-[240px]" />}>
+            <TrendChart data={trend} config={chartConfig} />
+          </Suspense>
+        </Panel>
 
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Account Balances</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {accountBalances.map((acc) => (
-              <div key={acc.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                <div
-                  className="size-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0"
-                  style={{ backgroundColor: `${acc.color}25`, color: acc.color }}
-                >
-                  {acc.name.charAt(0)}
+        {/* Account balances */}
+        <Panel>
+          <PanelTitle
+            trailing={
+              <Link
+                to="/accounts"
+                className="flex items-center gap-0.5 text-[13px] font-bold text-primary hover:underline"
+              >
+                {t('dashboard.manageAccounts')}
+                <Icon name="chevron_right" size={16} />
+              </Link>
+            }
+          >
+            {t('reports.accountBalances')}
+          </PanelTitle>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {balances.map((acc) => (
+              <Link
+                key={acc.id}
+                to="/accounts"
+                className="flex items-center gap-3 rounded-[14px] bg-background p-3 transition-colors hover:bg-secondary/60"
+              >
+                <InitialBadge color={acc.color}>{acc.name.charAt(0)}</InitialBadge>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold">{acc.name}</div>
+                  <div className="truncate text-[11px] text-muted-foreground">{acc.type}</div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{acc.name}</p>
-                  <p className="text-xs text-muted-foreground">{acc.type}</p>
-                </div>
-                <p className={cn('text-sm font-bold tabular-nums', acc.balance >= 0 ? 'text-chart-1' : 'text-destructive')}>
+                <div className={cn(
+                  'text-[13px] font-bold tabular-nums',
+                  acc.balance >= 0 ? 'text-primary' : 'text-danger'
+                )}>
                   {formatCurrency(acc.balance)}
-                </p>
-              </div>
+                </div>
+              </Link>
             ))}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </Panel>
+      </div>
+
+      <QuickAdd open={addOpen} onOpenChange={setAddOpen} />
+    </>
   );
 }

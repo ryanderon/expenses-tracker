@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -17,6 +16,9 @@ import {
 } from '@/components/ui/tooltip';
 import CurrencyInput from '@/components/ui/currency-input';
 import useStore from '@/store/useStore';
+import { useT } from '@/hooks/useT';
+import PageHeader from '@/components/PageHeader';
+import { SegmentedTabs } from '@/components/ui/design';
 import { formatCurrency, cn } from '@/lib/utils';
 
 const PERSON_COLORS = [
@@ -89,6 +91,7 @@ function PersonAvatar({ person, size = 'md', selected, onClick, showRemove, onRe
 }
 
 function BillItemCard({ item, index, people, onUpdate, onDelete, onTogglePerson }) {
+  const t = useT();
   const itemTotal = item.price * item.qty;
 
   return (
@@ -102,17 +105,17 @@ function BillItemCard({ item, index, people, onUpdate, onDelete, onTogglePerson 
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">Name</Label>
+          <Label className="text-xs text-muted-foreground">{t('splitBill.name')}</Label>
           <Input
             value={item.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
-            placeholder="Item name"
+            placeholder={t('splitBill.itemName')}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Price</Label>
+            <Label className="text-xs text-muted-foreground">{t('splitBill.price')}</Label>
             <CurrencyInput
               name={`item-${item.id}`}
               value={item.price || ''}
@@ -120,7 +123,7 @@ function BillItemCard({ item, index, people, onUpdate, onDelete, onTogglePerson 
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Qty</Label>
+            <Label className="text-xs text-muted-foreground">{t('splitBill.qty')}</Label>
             <Input
               type="number"
               min="1"
@@ -167,6 +170,7 @@ function BillItemCard({ item, index, people, onUpdate, onDelete, onTogglePerson 
 }
 
 export default function SplitBill() {
+  const t = useT();
   const { userName } = useStore();
   const [mode, setMode] = useState('manual');
   const [items, setItems] = useState([]);
@@ -334,26 +338,21 @@ export default function SplitBill() {
   }, [items, people, personTotals, subtotal, taxAmount, serviceAmount, discountAmount, grandTotal]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold">Split Bill</h2>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Split expenses with friends easily</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Tabs value={mode} onValueChange={setMode}>
-            <TabsList>
-              <TabsTrigger value="ocr" className="text-xs sm:text-sm gap-1.5">
-                <ScanLine className="size-3.5" /> Scan
-              </TabsTrigger>
-              <TabsTrigger value="manual" className="text-xs sm:text-sm gap-1.5">
-                <Receipt className="size-3.5" /> Manual
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      </div>
+    <>
+      <PageHeader
+        actions={
+          <SegmentedTabs
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'manual', label: t('splitBill.manual') },
+              { value: 'ocr', label: t('splitBill.scan') },
+            ]}
+          />
+        }
+      />
 
+      <div className="flex flex-col gap-4">
       {/* OCR Upload Section */}
       {mode === 'ocr' && (
         <Card className="border-dashed">
@@ -361,17 +360,17 @@ export default function SplitBill() {
             {ocrLoading ? (
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="size-10 text-primary animate-spin" />
-                <p className="text-sm font-medium">Scanning receipt...</p>
-                <p className="text-xs text-muted-foreground">This may take a few seconds</p>
+                <p className="text-sm font-medium">{t('splitBill.scanning')}</p>
+                <p className="text-xs text-muted-foreground">{t('splitBill.scanningHint')}</p>
               </div>
             ) : (
               <>
                 <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
                   <ImagePlus className="text-primary size-7" />
                 </div>
-                <h3 className="text-lg font-semibold mb-1">Scan a Receipt</h3>
+                <h3 className="text-lg font-semibold mb-1">{t('splitBill.scanTitle')}</h3>
                 <p className="text-sm text-muted-foreground max-w-sm mb-4">
-                  Take a photo or upload an image of your receipt. We'll extract the items automatically.
+                  {t('splitBill.scanBody')}
                 </p>
                 <div className="flex gap-2">
                   <Button onClick={() => fileInputRef.current?.click()}>
@@ -401,10 +400,10 @@ export default function SplitBill() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Users className="size-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">People ({people.length})</span>
+              <span className="text-sm font-semibold">{t('splitBill.people')} ({people.length})</span>
             </div>
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowAddPerson(true)}>
-              <UserPlus className="size-3.5 mr-1" /> Add
+              <UserPlus className="size-3.5 mr-1" /> {t('splitBill.addPerson')}
             </Button>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -424,7 +423,7 @@ export default function SplitBill() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Receipt className="size-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Items ({items.length})</span>
+              <span className="text-sm font-semibold">{t('splitBill.items')} ({items.length})</span>
             </div>
             <div className="flex gap-2">
               {items.length > 0 && (
@@ -438,7 +437,7 @@ export default function SplitBill() {
                 </Button>
               )}
               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addItem}>
-                <Plus className="size-3.5 mr-1" /> Add Item
+                <Plus className="size-3.5 mr-1" /> {t('splitBill.addItem')}
               </Button>
             </div>
           </div>
@@ -460,7 +459,7 @@ export default function SplitBill() {
           ) : (
             <div className="flex flex-col items-center py-8 text-center">
               <Receipt className="size-10 text-muted-foreground/50 mb-2" />
-              <p className="text-sm text-muted-foreground">No items yet. Add items or scan a receipt.</p>
+              <p className="text-sm text-muted-foreground">{t('splitBill.noItems')}</p>
             </div>
           )}
         </CardContent>
@@ -470,10 +469,10 @@ export default function SplitBill() {
       {items.length > 0 && (
         <Card>
           <CardContent className="p-4">
-            <span className="text-sm font-semibold mb-3 block">Additional Charges</span>
+            <span className="text-sm font-semibold mb-3 block">{t('splitBill.extraCharges')}</span>
             <div className="grid grid-cols-3 gap-3">
               <div className="flex flex-col gap-1">
-                <Label className="text-xs text-muted-foreground">Tax (%)</Label>
+                <Label className="text-xs text-muted-foreground">{t('splitBill.tax')}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -484,7 +483,7 @@ export default function SplitBill() {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <Label className="text-xs text-muted-foreground">Service (%)</Label>
+                <Label className="text-xs text-muted-foreground">{t('splitBill.service')}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -495,7 +494,7 @@ export default function SplitBill() {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <Label className="text-xs text-muted-foreground">Discount (%)</Label>
+                <Label className="text-xs text-muted-foreground">{t('splitBill.discount')}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -516,7 +515,7 @@ export default function SplitBill() {
           <CardContent className="p-4">
             <div className="flex flex-col gap-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-muted-foreground">{t('splitBill.subtotal')}</span>
                 <span className="tabular-nums">{formatCurrency(subtotal)}</span>
               </div>
               {taxAmount > 0 && (
@@ -539,7 +538,7 @@ export default function SplitBill() {
               )}
               <Separator />
               <div className="flex justify-between text-base font-bold">
-                <span>Grand Total</span>
+                <span>{t('splitBill.grandTotal')}</span>
                 <span className="tabular-nums">{formatCurrency(grandTotal)}</span>
               </div>
             </div>
@@ -552,7 +551,7 @@ export default function SplitBill() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold">Per Person</span>
+              <span className="text-sm font-semibold">{t('splitBill.perPerson')}</span>
               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleShare}>
                 <Share2 className="size-3.5 mr-1" /> Share
               </Button>
@@ -588,26 +587,27 @@ export default function SplitBill() {
       <Dialog open={showAddPerson} onOpenChange={setShowAddPerson}>
         <DialogContent className="sm:max-w-xs">
           <DialogHeader>
-            <DialogTitle>Add Person</DialogTitle>
-            <DialogDescription>Add someone to split the bill with.</DialogDescription>
+            <DialogTitle>{t('splitBill.addPerson')}</DialogTitle>
+            <DialogDescription>{t('splitBill.addPersonBody')}</DialogDescription>
           </DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); addPerson(); }} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label>Name</Label>
+              <Label>{t('splitBill.name')}</Label>
               <Input
                 value={newPersonName}
                 onChange={(e) => setNewPersonName(e.target.value)}
-                placeholder="Enter name..."
+                placeholder={t('splitBill.namePlaceholder')}
                 autoFocus
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddPerson(false)}>Cancel</Button>
-              <Button type="submit" disabled={!newPersonName.trim()}>Add</Button>
+              <Button type="button" variant="outline" onClick={() => setShowAddPerson(false)}>{t('common.cancel')}</Button>
+              <Button type="submit" disabled={!newPersonName.trim()}>{t('common.add')}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }

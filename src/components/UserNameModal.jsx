@@ -1,22 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { User } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/hooks/useT';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import useStore from '@/store/useStore';
 
 export default function UserNameModal({ editOpen, onEditClose }) {
+  const t = useT();
   const { userName, setUserName } = useStore();
-  const [name, setName] = useState('');
   const isFirstTime = !userName;
   const open = isFirstTime || editOpen;
 
-  useEffect(() => {
-    if (editOpen && userName) setName(userName);
-  }, [editOpen, userName]);
+  // Seeded from the stored name each time the dialog opens for an edit. Keying
+  // the draft on `open` beats syncing it in an effect, which would render the
+  // previous value once before correcting itself.
+  const [draft, setDraft] = useState({ open: false, value: '' });
+  const name = draft.open === open ? draft.value : (editOpen && userName ? userName : '');
+  const setName = (value) => setDraft({ open, value });
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -42,23 +46,23 @@ export default function UserNameModal({ editOpen, onEditClose }) {
           <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-2 mx-auto">
             <User className="text-primary size-7" />
           </div>
-          <DialogTitle className="text-xl">{isFirstTime ? 'Welcome to Penny!' : 'Change Name'}</DialogTitle>
+          <DialogTitle className="text-xl">{isFirstTime ? t('onboarding.title') : t('settings.yourName')}</DialogTitle>
           <DialogDescription>
-            {isFirstTime ? 'What should we call you? This helps personalize your experience.' : 'Update your display name.'}
+            {isFirstTime ? t('onboarding.body') : t('settings.namePlaceholder')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
           <div className="flex flex-col gap-1.5">
-            <Label>Your Name</Label>
+            <Label>{t('settings.yourName')}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name..."
+              placeholder={t('onboarding.placeholder')}
               autoFocus
             />
           </div>
           <Button type="submit" disabled={!name.trim()} className="w-full">
-            {isFirstTime ? 'Get Started' : 'Save'}
+            {isFirstTime ? t('onboarding.start') : t('common.save')}
           </Button>
         </form>
       </DialogContent>

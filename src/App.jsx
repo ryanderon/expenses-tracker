@@ -2,94 +2,88 @@ import {
   BrowserRouter,
   Routes,
   Route,
+  Navigate,
   NavLink,
   useLocation,
 } from "react-router-dom";
-import { useState, useRef } from "react";
+import { useState, useRef, lazy, Suspense } from "react";
 import {
-  LayoutDashboard,
-  ArrowLeftRight,
-  PieChart,
-  Target,
-  FileText,
-  Menu,
-  Download,
-  Upload,
-  HardDriveDownload,
-  Wallet,
-  Tags,
-  Scissors,
-  Sun,
-  Moon,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { TooltipProvider } from "@/components/ui/tooltip";
+  TooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Icon } from "@/components/ui/design";
 import Dashboard from "@/pages/Dashboard";
+import Today from "@/pages/Today";
 import Transactions from "@/pages/Transactions";
-import AnalyticsPage from "@/pages/Analytics";
 import Budget from "@/pages/Budget";
-import Reports from "@/pages/Reports";
 import Accounts from "@/pages/Accounts";
 import Categories from "@/pages/Categories";
 import SplitBill from "@/pages/SplitBill";
 import useStore from "@/store/useStore";
 import { exportToExcel } from "@/lib/excel";
 import { cn } from "@/lib/utils";
+import { NAV_ITEMS, MOBILE_NAV } from "@/lib/nav";
 import Tour, { TourTrigger } from "@/components/Tour";
 import UserNameModal from "@/components/UserNameModal";
+import { BackupProvider } from "@/components/BackupProvider";
+import { useBackup } from "@/hooks/useGoogleBackup";
+import { useT } from "@/hooks/useT";
 import useTheme from "@/hooks/useTheme";
-import { Analytics  } from "@vercel/analytics/react";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 
-const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { to: "/analytics", label: "Analytics", icon: PieChart },
-  { to: "/budget", label: "Budget", icon: Target },
-  { to: "/reports", label: "Reports", icon: FileText },
-  { to: "/accounts", label: "Accounts", icon: Wallet },
-  { to: "/categories", label: "Categories", icon: Tags },
-  { to: "/split-bill", label: "Split Bill", icon: Scissors },
-];
+// Recharts and the Anthropic SDK are heavy; keep them out of the first paint.
+const Analytics = lazy(() => import("@/pages/Analytics"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const Portfolio = lazy(() => import("@/pages/Portfolio"));
+const Insights = lazy(() => import("@/pages/Insights"));
+const SettingsPage = lazy(() => import("@/pages/Settings"));
 
-const PAGE_TITLES = {
-  "/": "Dashboard",
-  "/transactions": "Transactions",
-  "/analytics": "Analytics",
-  "/budget": "Budget",
-  "/reports": "Reports",
-  "/accounts": "Accounts",
-  "/categories": "Categories",
-  "/split-bill": "Split Bill",
-};
+function RouteFallback() {
+  return (
+    <div className="flex items-center justify-center py-24">
+      <Icon name="progress_activity" className="animate-spin text-muted-foreground" size={22} />
+    </div>
+  );
+}
 
 function SidebarNav({ onNavigate }) {
-  const location = useLocation();
+  const t = useT();
+  const { pathname } = useLocation();
 
   return (
-    <nav className="flex flex-col gap-1 flex-1 p-3">
-      {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
-        const isActive = location.pathname === to;
+    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3">
+      {NAV_ITEMS.map(({ to, labelKey, icon }) => {
+        const active = pathname === to;
         return (
           <NavLink
             key={to}
             to={to}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              isActive
-                ? "bg-secondary text-primary"
-                : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
+              "flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[13.5px] transition-colors",
+              active
+                ? "bg-[var(--primary-soft)] font-bold text-primary"
+                : "font-semibold text-muted-foreground hover:text-foreground",
             )}
           >
-            <Icon />
-            {label}
+            <Icon name={icon} size={20} />
+            {t(labelKey)}
           </NavLink>
         );
       })}
@@ -97,111 +91,139 @@ function SidebarNav({ onNavigate }) {
   );
 }
 
-function DesktopSidebar({ onEditName }) {
-  const { userName } = useStore();
+function SidebarBrand({ onEditName, onNavigate }) {
+  const t = useT();
+  const userName = useStore((s) => s.userName);
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-background">
-      <div className="flex items-center gap-3 p-5">
-        <div className="size-9 rounded-xl bg-primary/10 flex items-center justify-center">
-          <span className="text-sm font-bold text-primary">P</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-lg font-bold tracking-tight font-serif leading-tight">
-            Penny
-          </span>
-          {userName && (
-            <button onClick={onEditName} className="text-[13px] mt-[1px] font-serif text-muted-foreground truncate max-w-[140px] hover:text-foreground transition-colors cursor-pointer text-left">
-              Hi, {userName}
-            </button>
-          )}
-        </div>
+    <div className="flex items-center gap-3 px-5 pb-[18px] pt-[22px]">
+      <div className="flex size-[38px] shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[var(--teal)] shadow-[0_4px_12px_var(--primary-soft)]">
+        <span className="text-base font-extrabold text-primary-foreground">P</span>
       </div>
-      <Separator />
-      <SidebarNav />
-      <div className="mt-auto p-4">
-        <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
-          <p className="text-[11px] text-muted-foreground/70">
-            made with ☕ by
-          </p>
-          <a
-            href="https://github.com/ryanderon"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+      <div className="min-w-0">
+        <div className="text-[17px] font-extrabold tracking-[-0.02em]">Penny</div>
+        {userName && (
+          <button
+            onClick={() => {
+              onEditName();
+              onNavigate?.();
+            }}
+            className="-mt-px block max-w-35 truncate text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
-            ryanderon
-          </a>
-        </div>
+            {t("app.greeting", { name: userName })}
+          </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** A signature, not interface copy — it reads the same in every language. */
+function SidebarFooter() {
+  return (
+    <div className="mt-auto p-4">
+      <div className="rounded-[14px] bg-[var(--primary-soft)] px-3.5 py-3 text-center">
+        <div className="text-[10px] tracking-[0.03em] text-muted-foreground">
+          made with ☕ by
+        </div>
+        <a
+          href="https://github.com/ryanderon"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-0.5 block text-xs font-bold hover:text-primary"
+        >
+          ryanderon
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function SidebarBody({ onEditName, onNavigate }) {
+  return (
+    <>
+      <SidebarBrand onEditName={onEditName} onNavigate={onNavigate} />
+      <div className="mx-5 mb-3 h-px bg-border" />
+      <SidebarNav onNavigate={onNavigate} />
+      <SidebarFooter />
+    </>
+  );
+}
+
+function DesktopSidebar({ onEditName }) {
+  return (
+    <aside className="sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar lg:flex">
+      <SidebarBody onEditName={onEditName} />
     </aside>
   );
 }
 
 function MobileSidebar({ onEditName }) {
   const [open, setOpen] = useState(false);
-  const { userName } = useStore();
-
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="lg:hidden">
-          <Menu data-icon />
-        </Button>
+        <button
+          className="flex size-9 items-center justify-center rounded-[10px] border border-border bg-card lg:hidden"
+          aria-label="Menu"
+        >
+          <Icon name="menu" size={19} />
+        </button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-64 p-0">
-        <SheetTitle className="sr-only">Navigation</SheetTitle>
-        <div className="flex items-center gap-3 p-5">
-          <div className="size-9 rounded-xl bg-primary/10 flex items-center justify-center">
-            <span className="text-sm font-bold text-primary">P</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold tracking-tight font-serif leading-tight">
-              Penny
-            </span>
-            {userName && (
-              <button onClick={() => { onEditName(); setOpen(false); }} className="text-[13px] mt-[1px] font-serif text-muted-foreground truncate max-w-[140px] hover:text-foreground transition-colors cursor-pointer text-left">
-                Hi, {userName}
-              </button>
-            )}
-          </div>
-        </div>
-        <Separator />
-        <SidebarNav onNavigate={() => setOpen(false)} />
-        <div className="mt-auto p-4">
-          <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
-            <p className="text-[11px] text-muted-foreground/70">
-              made with ☕ by
-            </p>
-            <a
-              href="https://github.com/ryanderon"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
-            >
-              ryanderon
-            </a>
-          </div>
-        </div>
+      <SheetContent side="left" className="flex w-[264px] flex-col bg-sidebar p-0">
+        <SheetTitle className="sr-only">Penny</SheetTitle>
+        <SidebarBody onEditName={onEditName} onNavigate={() => setOpen(false)} />
       </SheetContent>
     </Sheet>
   );
 }
 
-function AppShell() {
-  const location = useLocation();
-  const { transactions, accounts, exportData, importData } = useStore();
-  const { theme, toggle: toggleTheme } = useTheme();
-  const title = PAGE_TITLES[location.pathname] || "Penny";
-  const fileInputRef = useRef(null);
-  const [editNameOpen, setEditNameOpen] = useState(false);
+function SyncIndicator() {
+  const t = useT();
+  const backup = useBackup();
+  if (!backup.enabled) return null;
 
-  const handleExport = () =>
+  const { status, pendingChanges, error, lastSyncedAt } = backup;
+
+  let icon = "cloud_done";
+  if (status === "syncing") icon = "cloud_sync";
+  else if (status === "error") icon = "cloud_off";
+
+  let tone = "text-[var(--teal)]";
+  if (status === "error") tone = "text-[var(--danger)]";
+  else if (pendingChanges) tone = "text-muted-foreground";
+
+  let message;
+  if (status === "error") message = error || t("app.syncFailed");
+  else if (status === "syncing") message = t("app.syncing");
+  else if (pendingChanges) message = t("app.syncPending");
+  else if (lastSyncedAt)
+    message = t("app.syncedAt", { time: new Date(lastSyncedAt).toLocaleString() });
+  else message = t("app.syncConnected");
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn("hidden size-9 items-center justify-center rounded-[10px] sm:inline-flex", tone)}>
+          <Icon name={icon} size={19} className={cn(status === "syncing" && "animate-pulse")} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{message}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function HeaderActions() {
+  const t = useT();
+  const { transactions, accounts, exportData, importData, userName } = useStore();
+  const { theme, toggle: toggleTheme } = useTheme();
+  const fileInputRef = useRef(null);
+
+  const handleExportExcel = () =>
     exportToExcel(transactions, accounts, "penny-all-transactions");
 
   const handleExportData = () => {
-    const data = exportData();
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
+    const blob = new Blob([JSON.stringify(exportData(), null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -219,23 +241,16 @@ function AppShell() {
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target.result);
-        if (
-          !Array.isArray(data.transactions) ||
-          !Array.isArray(data.accounts)
-        ) {
-          alert("Invalid backup file format.");
+        if (!Array.isArray(data.transactions) || !Array.isArray(data.accounts)) {
+          alert(t("settings.importBadFormat"));
           return;
         }
-        if (
-          window.confirm(
-            `This will replace all your current data with the backup (${data.transactions.length} transactions, ${data.accounts.length} accounts). Continue?`,
-          )
-        ) {
+        if (window.confirm(t("settings.importConfirm", { count: data.transactions.length }))) {
           importData(data);
-          alert("Data imported successfully!");
+          alert(t("settings.importSuccess"));
         }
       } catch {
-        alert("Failed to read file. Make sure it is a valid Penny backup.");
+        alert(t("settings.importInvalid"));
       }
     };
     reader.readAsText(file);
@@ -243,159 +258,202 @@ function AppShell() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <DesktopSidebar onEditName={() => setEditNameOpen(true)} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="flex items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 lg:px-6 border-b border-border bg-background/90 backdrop-blur-sm sticky top-0">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <MobileSidebar onEditName={() => setEditNameOpen(true)} />
-            <h1 className="hidden lg:block text-lg font-bold">{title}</h1>
-          </div>
-          <div
-            data-tour="header-actions"
-            className="flex items-center gap-1 sm:gap-2"
+    <div data-tour="header-actions" className="flex items-center gap-2.5">
+      <SyncIndicator />
+      <TourTrigger />
+
+      <button
+        onClick={toggleTheme}
+        aria-label={t("app.toggleTheme")}
+        className="flex size-9 items-center justify-center rounded-[10px] border border-border bg-card text-foreground transition-colors hover:text-primary"
+      >
+        <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} size={19} />
+      </button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            aria-label={t("app.moreActions")}
+            className="flex size-9 items-center justify-center rounded-[10px] border border-border bg-card text-foreground transition-colors hover:text-primary"
           >
-            <TourTrigger />
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8 sm:hidden"
-              onClick={toggleTheme}
-            >
-              {theme === "dark" ? <Sun data-icon /> : <Moon data-icon />}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={toggleTheme}
-              className="gap-1.5 hidden sm:inline-flex"
-            >
-              {theme === "dark" ? (
-                <Sun data-icon="inline-start" />
-              ) : (
-                <Moon data-icon="inline-start" />
-              )}
-              <span className="hidden md:inline">
-                {theme === "dark" ? "Light" : "Dark"}
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8 sm:hidden"
-              onClick={handleExportData}
-            >
-              <HardDriveDownload data-icon />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportData}
-              className="hidden sm:inline-flex"
-            >
-              <HardDriveDownload data-icon="inline-start" />
-              <span className="hidden md:inline">Backup</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8 sm:hidden"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload data-icon />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              className="hidden sm:inline-flex"
-            >
-              <Upload data-icon="inline-start" />
-              <span className="hidden md:inline">Restore</span>
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={handleImportData}
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8 sm:hidden"
-              onClick={handleExport}
-            >
-              <Download data-icon />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              className="hidden sm:inline-flex"
-            >
-              <Download data-icon="inline-start" />
-              <span className="hidden md:inline">Export Excel</span>
-            </Button>
+            <Icon name="more_vert" size={19} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>{t("app.data")}</DropdownMenuLabel>
+          <DropdownMenuItem onSelect={handleExportData}>
+            <Icon name="save" size={17} /> {t("app.backupToFile")}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
+            <Icon name="upload" size={17} /> {t("app.restoreFromFile")}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={handleExportExcel}>
+            <Icon name="download" size={17} /> {t("app.exportExcel")}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Avatar, as in the design's header. */}
+      <NavLink
+        to="/settings"
+        aria-label={t("nav.settings")}
+        className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[var(--violet)] text-[13px] font-bold text-primary-foreground"
+      >
+        {(userName || "P").charAt(0).toUpperCase()}
+      </NavLink>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={handleImportData}
+      />
+    </div>
+  );
+}
+
+/** Bottom bar for phones — the design is desktop-only, so this is additive. */
+function MobileBottomNav({ onOpenMenu }) {
+  const t = useT();
+  const { pathname } = useLocation();
+  const inBar = MOBILE_NAV.some((i) => i.to === pathname);
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
+      <div className="flex justify-around">
+        {MOBILE_NAV.map(({ to, labelKey, icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              cn(
+                "flex flex-col items-center px-2 py-2.5 transition-colors",
+                isActive ? "text-primary" : "text-muted-foreground",
+              )
+            }
+          >
+            <Icon name={icon} size={21} />
+            <span className="mt-0.5 text-[10px] font-semibold">{t(labelKey)}</span>
+          </NavLink>
+        ))}
+        <button
+          onClick={onOpenMenu}
+          className={cn(
+            "flex flex-col items-center px-2 py-2.5 transition-colors",
+            inBar ? "text-muted-foreground" : "text-primary",
+          )}
+        >
+          <Icon name="apps" size={21} />
+          <span className="mt-0.5 text-[10px] font-semibold">{t("nav.more")}</span>
+        </button>
+      </div>
+    </nav>
+  );
+}
+
+function AppShell() {
+  const t = useT();
+  const { pathname } = useLocation();
+  const [editNameOpen, setEditNameOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const current = NAV_ITEMS.find((i) => i.to === pathname);
+
+  return (
+    <div className="flex min-h-screen bg-background text-foreground">
+      <DesktopSidebar onEditName={() => setEditNameOpen(true)} />
+
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-4 py-3 lg:px-8">
+          <div className="flex items-center gap-3">
+            <MobileSidebar onEditName={() => setEditNameOpen(true)} />
+            <span className="text-[15px] font-bold">
+              {current ? t(current.labelKey) : "Penny"}
+            </span>
           </div>
+          <HeaderActions />
         </header>
 
-        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/transactions" element={<Transactions />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/budget" element={<Budget />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/accounts" element={<Accounts />} />
-              <Route path="/categories" element={<Categories />} />
-              <Route path="/split-bill" element={<SplitBill />} />
-            </Routes>
+        <main className="flex-1 px-4 pb-24 pt-6 lg:px-8 lg:pb-16 lg:pt-7">
+          <div className="mx-auto w-full max-w-[1240px]">
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/today" element={<Today />} />
+                <Route path="/transactions" element={<Transactions />} />
+                <Route path="/insights" element={<Insights />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/budget" element={<Budget />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/portfolio" element={<Portfolio />} />
+                <Route path="/accounts" element={<Accounts />} />
+                <Route path="/categories" element={<Categories />} />
+                <Route path="/split-bill" element={<SplitBill />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                {/* The previous build's catch-all page is gone. */}
+                <Route path="/more" element={<Navigate to="/settings" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
           </div>
         </main>
       </div>
 
-      <MobileBottomNav />
+      <MobileBottomNav onOpenMenu={() => setMenuOpen(true)} />
+
+      {/* Full nav for phones, opened from the bottom bar's menu button. */}
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent side="left" className="flex w-[264px] flex-col bg-sidebar p-0">
+          <SheetTitle className="sr-only">Penny</SheetTitle>
+          <SidebarBody
+            onEditName={() => setEditNameOpen(true)}
+            onNavigate={() => setMenuOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
+
       <Tour />
       <UserNameModal editOpen={editNameOpen} onEditClose={() => setEditNameOpen(false)} />
     </div>
   );
 }
 
-function MobileBottomNav() {
-  return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t border-border px-2 pb-[env(safe-area-inset-bottom)]">
-      <div className="flex justify-around">
-        {NAV_ITEMS.slice(0, 5).map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                "flex flex-col items-center py-2.5 px-3 transition-colors",
-                isActive
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground",
-              )
-            }
-          >
-            <Icon />
-            <span className="text-[10px] mt-0.5 font-medium">{label}</span>
-          </NavLink>
-        ))}
+/**
+ * IndexedDB reads are async, so the store starts empty for a beat. Rendering
+ * before hydration would flash an empty dashboard and let the name modal fire
+ * for an existing user.
+ */
+function HydrationGate({ children }) {
+  const hasHydrated = useStore((s) => s._hasHydrated);
+
+  if (!hasHydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[var(--teal)]">
+            <span className="text-lg font-extrabold text-primary-foreground">P</span>
+          </div>
+          <Icon name="progress_activity" size={18} className="animate-spin text-muted-foreground" />
+        </div>
       </div>
-    </nav>
-  );
+    );
+  }
+  return children;
 }
 
 export default function App() {
   return (
     <>
-      <Analytics />
+      <VercelAnalytics />
       <BrowserRouter>
         <TooltipProvider>
-          <AppShell />
+          <HydrationGate>
+            <BackupProvider>
+              <AppShell />
+            </BackupProvider>
+          </HydrationGate>
         </TooltipProvider>
       </BrowserRouter>
     </>

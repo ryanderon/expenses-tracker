@@ -17,16 +17,21 @@ import {
 import useStore from '@/store/useStore';
 import { CATEGORIES, CATEGORY_TYPES, CATEGORY_COLORS, getAllCategories } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { Icon, SoftBadge } from '@/components/ui/design';
+import PageHeader from '@/components/PageHeader';
+import { useT } from '@/hooks/useT';
+import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
 
 const TYPE_BADGES = {
-  income: { label: 'Income', className: 'bg-chart-1/15 text-chart-1 border-chart-1/30' },
-  expense: { label: 'Expense', className: 'bg-destructive/15 text-destructive border-destructive/30' },
-  savings: { label: 'Savings', className: 'bg-chart-3/15 text-chart-3 border-chart-3/30' },
-  investment: { label: 'Investment', className: 'bg-chart-4/15 text-chart-4 border-chart-4/30' },
-  transfer: { label: 'Transfer', className: 'bg-muted text-muted-foreground border-border' },
+  income: { labelKey: 'categories.typeIncome', tone: 'primary' },
+  expense: { labelKey: 'categories.typeExpense', tone: 'danger' },
+  savings: { labelKey: 'categories.typeSavings', tone: 'teal' },
+  investment: { labelKey: 'categories.typeInvestment', tone: 'violet' },
+  transfer: { labelKey: 'categories.typeTransfer', tone: 'muted' },
 };
 
 function CategoryFormDialog({ open, onOpenChange, category, onSubmit }) {
+  const t = useT();
   const [form, setForm] = useState(
     category
       ? { label: category.label, type: category.type, hex: category.hex }
@@ -44,9 +49,9 @@ function CategoryFormDialog({ open, onOpenChange, category, onSubmit }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{category ? 'Edit Category' : 'New Category'}</DialogTitle>
+          <DialogTitle>{category ? t('categories.editTitle') : t('categories.newTitle')}</DialogTitle>
           <DialogDescription>
-            {category ? 'Update your category details.' : 'Create a custom category to organize your transactions.'}
+            {category ? t('categories.editDescription') : t('categories.newDescription')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -96,7 +101,7 @@ function CategoryFormDialog({ open, onOpenChange, category, onSubmit }) {
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
             <Button type="submit">{category ? 'Update' : 'Create Category'}</Button>
           </DialogFooter>
         </form>
@@ -130,23 +135,22 @@ function SubcategoryInput({ onAdd }) {
   );
 }
 
-function CategoryCard({ categoryKey, category, isBuiltIn, customSubs, onAddSub, onRemoveSub, onEdit, onDelete }) {
+function CategoryCard({ category, isBuiltIn, customSubs, onAddSub, onRemoveSub, onEdit, onDelete }) {
+  const t = useT();
   const typeBadge = TYPE_BADGES[category.type] || TYPE_BADGES.expense;
   const defaultSubs = category.subcategories || [];
 
   return (
-    <Card className="overflow-hidden" py="pb-4">
+    <div className="overflow-hidden rounded-[18px] border border-border bg-card shadow-(--shadow-card)">
       <div className="h-1.5" style={{ backgroundColor: category.hex }} />
-      <CardContent className="p-4 pt-4">
+      <div className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="size-3 rounded-full shrink-0" style={{ backgroundColor: category.hex }} />
-            <h3 className="text-sm font-semibold truncate">{category.label}</h3>
+            <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: category.hex }} />
+            <h3 className="text-sm font-bold truncate">{categoryLabel(category, t)}</h3>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', typeBadge.className)}>
-              {typeBadge.label}
-            </Badge>
+            <SoftBadge tone={typeBadge.tone}>{t(typeBadge.labelKey)}</SoftBadge>
             {!isBuiltIn && (
               <>
                 <Tooltip>
@@ -155,7 +159,7 @@ function CategoryCard({ categoryKey, category, isBuiltIn, customSubs, onAddSub, 
                       <Pencil className="size-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Edit</TooltipContent>
+                  <TooltipContent>{t('common.edit')}</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -163,7 +167,7 @@ function CategoryCard({ categoryKey, category, isBuiltIn, customSubs, onAddSub, 
                       <Trash2 className="size-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Delete</TooltipContent>
+                  <TooltipContent>{t('common.delete')}</TooltipContent>
                 </Tooltip>
               </>
             )}
@@ -171,25 +175,22 @@ function CategoryCard({ categoryKey, category, isBuiltIn, customSubs, onAddSub, 
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Subcategories</p>
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{t('categories.subcategories')}</p>
 
           {isBuiltIn && (
             <div className="flex flex-wrap gap-1.5">
               {defaultSubs.map((sub) => (
-                <Badge key={sub} variant="secondary" className="text-xs font-normal gap-1">
-                  {sub}
-                </Badge>
+                <span key={sub} className="rounded-full border border-border bg-background px-2.5 py-1 text-[11.5px] text-muted-foreground">
+                  {subcategoryLabel(sub, t)}
+                </span>
               ))}
               {customSubs.map((sub) => (
-                <Badge key={sub} variant="outline" className="text-xs font-normal gap-1 pr-1 border-dashed">
-                  {sub}
-                  <button
-                    onClick={() => onRemoveSub(sub)}
-                    className="ml-0.5 hover:text-destructive rounded-sm p-0.5 transition-colors"
-                  >
-                    <X className="size-3" />
+                <span key={sub} className="flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-[11.5px] text-muted-foreground">
+                  {subcategoryLabel(sub, t)}
+                  <button onClick={() => onRemoveSub(sub)} className="rounded-sm transition-colors hover:text-danger">
+                    <Icon name="close" size={13} />
                   </button>
-                </Badge>
+                </span>
               ))}
             </div>
           )}
@@ -197,29 +198,27 @@ function CategoryCard({ categoryKey, category, isBuiltIn, customSubs, onAddSub, 
           {!isBuiltIn && (
             <div className="flex flex-wrap gap-1.5">
               {defaultSubs.length > 0 ? defaultSubs.map((sub) => (
-                <Badge key={sub} variant="outline" className="text-xs font-normal gap-1 pr-1 border-dashed">
-                  {sub}
-                  <button
-                    onClick={() => onRemoveSub(sub)}
-                    className="ml-0.5 hover:text-destructive rounded-sm p-0.5 transition-colors"
-                  >
-                    <X className="size-3" />
+                <span key={sub} className="flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-[11.5px] text-muted-foreground">
+                  {subcategoryLabel(sub, t)}
+                  <button onClick={() => onRemoveSub(sub)} className="rounded-sm transition-colors hover:text-danger">
+                    <Icon name="close" size={13} />
                   </button>
-                </Badge>
+                </span>
               )) : (
-                <p className="text-xs text-muted-foreground italic">No subcategories yet</p>
+                <p className="text-xs italic text-muted-foreground">{t('budget.noCustomSubcategories')}</p>
               )}
             </div>
           )}
         </div>
 
         <SubcategoryInput onAdd={onAddSub} />
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 export default function Categories() {
+  const t = useT();
   const {
     customSubcategories, customCategories, transactions,
     addCustomSubcategory, removeCustomSubcategory,
@@ -281,20 +280,21 @@ export default function Categories() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold">Categories</h2>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Manage your transaction categories and subcategories</p>
-        </div>
-        <Button onClick={openNew} size="sm" className="shrink-0 self-start sm:self-auto">
-          <Plus data-icon="inline-start" /> Add Category
-        </Button>
-      </div>
-
+    <>
+      <PageHeader
+        actions={
+          <Button
+            onClick={openNew}
+            className="rounded-xl px-4 py-2.5 font-bold shadow-[0_4px_14px_var(--primary-soft)]"
+          >
+            <Icon name="add" size={18} /> {t('categories.add')}
+          </Button>
+        }
+      />
+      <div className="flex flex-col gap-5">
       {/* Built-in Categories */}
       <div>
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Built-in Categories</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t('categories.builtIn')}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {builtInEntries.map(([key, cat]) => (
             <CategoryCard
@@ -338,12 +338,12 @@ export default function Categories() {
             <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
               <Tags className="text-primary" />
             </div>
-            <h3 className="text-lg font-semibold mb-1">No custom categories</h3>
+            <h3 className="text-lg font-semibold mb-1">{t('categories.emptyCustomTitle')}</h3>
             <p className="text-sm text-muted-foreground max-w-sm mb-4">
-              Built-in categories cover most needs. Create custom ones for specific tracking.
+              {t('categories.emptyCustomBody')}
             </p>
             <Button variant="outline" onClick={openNew}>
-              <Plus data-icon="inline-start" /> Create Custom Category
+              <Plus data-icon="inline-start" /> {t('categories.createCustom')}
             </Button>
           </CardContent>
         </Card>
@@ -357,6 +357,7 @@ export default function Categories() {
           onSubmit={editingCategory ? handleEditCategory : handleCreateCategory}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 }
