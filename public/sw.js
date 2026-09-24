@@ -1,12 +1,12 @@
-const CACHE_NAME = 'penny-v3';
+const CACHE_NAME = 'penny-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/favicon.svg',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg',
-  '/icons/apple-touch-icon.png',
+  '/favicon.svg?v=2',
+  '/icons/icon-192.png?v=2',
+  '/icons/icon-512.png?v=2',
+  '/icons/apple-touch-icon.png?v=2',
 ];
 
 self.addEventListener('install', (event) => {
