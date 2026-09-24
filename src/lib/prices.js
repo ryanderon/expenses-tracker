@@ -1,21 +1,49 @@
 /**
- * Twelve Data price client, called straight from the browser.
+ * Price client with two sources.
  *
- * Same bring-your-own-key shape as the Claude integration: the key lives on
- * this device, requests go direct, and there's no backend in the middle.
+ * Twelve Data's free plan only covers US listings — anything on IDX comes
+ * back as "your plan doesn't cover this exchange". So holdings on exchanges
+ * Yahoo Finance knows go through `/api/quote` (a thin proxy, see api/quote.js)
+ * and need no key; everything else uses Twelve Data with the user's own key,
+ * called straight from the browser.
  *
- * Quotes are deliberately rationed — see `PRICE_BUDGET`. A portfolio's value
- * doesn't change meaningfully between refreshes, and the free plan's daily
- * credit pool is worth protecting.
+ * Twelve Data quotes are deliberately rationed — see `PRICE_BUDGET`. Symbol
+ * search stays on Twelve Data because it's free and needs no key.
  */
 
 const BASE = 'https://api.twelvedata.com';
+const YAHOO_PROXY = '/api/quote';
+const YAHOO_BATCH = 20;
 
-/** Free plan gives 800 credits/day; we use a tiny slice of it on purpose. */
+/**
+ * Free plan gives 800 credits/day; we use a tiny slice of it on purpose.
+ * A refresh that spends no credits (Yahoo only) can run far more often.
+ */
 export const PRICE_BUDGET = {
   autoPerDay: 4,
   minGapMs: 6 * 60 * 60 * 1000, // 24h / 4
+  freeGapMs: 15 * 60 * 1000,
 };
+
+/** Twelve Data exchange → Yahoo ticker suffix (`BBCA` on IDX is `BBCA.JK`). */
+const YAHOO_SUFFIXES = {
+  IDX: 'JK',
+  LSE: 'L',
+  TSX: 'TO',
+  ASX: 'AX',
+  SGX: 'SI',
+  XETR: 'DE',
+  NSE: 'NS',
+  BSE: 'BO',
+  JPX: 'T',
+  KRX: 'KS',
+};
+
+/** The Yahoo ticker for a holding, or null when it has to go to Twelve Data. */
+export function yahooSymbolFor(holding) {
+  const suffix = YAHOO_SUFFIXES[holding.exchange?.toUpperCase()];
+  return suffix ? `${holding.symbol}.${suffix}`.toUpperCase() : null;
+}
 
 /** IDX quotes 1 lot = 100 shares. Everything else is per share. */
 const LOT_SIZES = { IDX: 100 };
@@ -113,18 +141,60 @@ function normaliseQuote(raw) {
 }
 
 /**
- * Fetches quotes for many holdings at once.
- *
- * Symbols are grouped by exchange because `BBCA` exists on IDX, CBOE, IEX and
- * BMV as four different instruments — without the exchange filter you get
- * whichever one Twelve Data picks.
- *
- * Returns `{ quotes, errors }` rather than throwing, so one dead ticker can't
- * blank out the whole portfolio.
+ * Yahoo quotes via the same-origin proxy, keyed by Yahoo ticker. Tickers
+ * Yahoo doesn't know are simply absent from the result.
  */
-export async function fetchQuotes(apiKey, holdings) {
-  if (!apiKey) throw new PriceError('prices.errNoKey');
-  if (holdings.length === 0) return { quotes: {}, errors: {} };
+async function fetchYahoo(symbols) {
+  const out = {};
+  for (let i = 0; i < symbols.length; i += YAHOO_BATCH) {
+    const batch = symbols.slice(i, i + YAHOO_BATCH);
+    let res;
+    try {
+      res = await fetch(`${YAHOO_PROXY}?symbols=${batch.map(encodeURIComponent).join(',')}`);
+    } catch (err) {
+      throw new PriceError('prices.errYahoo', err);
+    }
+    if (!res.ok) throw new PriceError('prices.errYahoo');
+
+    let body;
+    try {
+      body = await res.json();
+    } catch (err) {
+      throw new PriceError('prices.errYahoo', err);
+    }
+    Object.assign(out, body.quotes);
+  }
+  return out;
+}
+
+async function yahooQuotes(holdings, quotes, errors) {
+  const byTicker = new Map(holdings.map((h) => [yahooSymbolFor(h), h]));
+
+  let found;
+  try {
+    found = await fetchYahoo([...byTicker.keys()]);
+  } catch (err) {
+    for (const h of holdings) errors[priceKey(h.exchange, h.symbol)] = err.i18nKey;
+    return;
+  }
+
+  for (const [ticker, h] of byTicker) {
+    const key = priceKey(h.exchange, h.symbol);
+    if (found[ticker]) quotes[key] = { ...found[ticker], at: Date.now() };
+    else errors[key] = 'prices.errSymbol';
+  }
+}
+
+/**
+ * Twelve Data quotes, grouped by exchange because `BBCA` exists on IDX, CBOE,
+ * IEX and BMV as four different instruments — without the exchange filter you
+ * get whichever one Twelve Data picks.
+ */
+async function twelveDataQuotes(apiKey, holdings, quotes, errors) {
+  if (!apiKey) {
+    for (const h of holdings) errors[priceKey(h.exchange, h.symbol)] = 'prices.errNoKey';
+    return;
+  }
 
   const byExchange = new Map();
   for (const h of holdings) {
@@ -132,9 +202,6 @@ export async function fetchQuotes(apiKey, holdings) {
     list.push(h);
     byExchange.set(h.exchange, list);
   }
-
-  const quotes = {};
-  const errors = {};
 
   for (const [exchange, group] of byExchange) {
     const symbols = [...new Set(group.map((h) => h.symbol))];
@@ -169,26 +236,65 @@ export async function fetchQuotes(apiKey, holdings) {
       if (err.i18nKey === 'prices.errQuota' || err.i18nKey === 'prices.errKey') break;
     }
   }
+}
+
+/**
+ * Fetches quotes for many holdings at once, each from the source that covers
+ * its exchange.
+ *
+ * Returns `{ quotes, errors }` rather than throwing, so one dead ticker — or
+ * one source being down — can't blank out the whole portfolio.
+ */
+export async function fetchQuotes(apiKey, holdings) {
+  const quotes = {};
+  const errors = {};
+
+  const viaYahoo = holdings.filter((h) => yahooSymbolFor(h));
+  const viaTwelveData = holdings.filter((h) => !yahooSymbolFor(h));
+
+  await Promise.all([
+    viaYahoo.length && yahooQuotes(viaYahoo, quotes, errors),
+    viaTwelveData.length && twelveDataQuotes(apiKey, viaTwelveData, quotes, errors),
+  ]);
 
   return { quotes, errors };
 }
 
 /**
- * FX rate, used only when holdings span currencies. One extra credit per
- * foreign currency per refresh.
+ * FX rates into `base`, used only when holdings span currencies. Yahoo first
+ * since it costs nothing; Twelve Data (one credit each) only as a fallback.
+ * A currency missing from the result just stays out of the combined total.
  */
-export async function fetchRate(apiKey, from, to) {
-  if (from === to) return 1;
-  const body = await getJson('exchange_rate', { symbol: `${from}/${to}`, apikey: apiKey });
-  const rate = Number.parseFloat(body.rate);
-  return Number.isFinite(rate) ? rate : null;
+export async function fetchRates(apiKey, currencies, base) {
+  const rates = {};
+  if (currencies.length === 0) return rates;
+
+  try {
+    const found = await fetchYahoo(currencies.map((c) => `${c}${base}=X`));
+    for (const c of currencies) {
+      const price = found[`${c}${base}=X`.toUpperCase()]?.price;
+      if (price) rates[c] = price;
+    }
+  } catch {
+    // Fall through to Twelve Data.
+  }
+
+  if (!apiKey) return rates;
+  for (const c of currencies.filter((x) => !rates[x])) {
+    try {
+      const body = await getJson('exchange_rate', { symbol: `${c}/${base}`, apikey: apiKey });
+      const rate = Number.parseFloat(body.rate);
+      if (Number.isFinite(rate)) rates[c] = rate;
+    } catch {
+      // Leave it out.
+    }
+  }
+  return rates;
 }
 
-/** How many credits a refresh of these holdings would cost. */
-export function estimateCredits(holdings, baseCurrency = 'IDR') {
-  const symbols = new Set(holdings.map((h) => priceKey(h.exchange, h.symbol)));
-  const currencies = new Set(
-    holdings.map((h) => h.currency).filter((c) => c && c !== baseCurrency)
-  );
-  return symbols.size + currencies.size;
+/** How many Twelve Data credits a refresh of these holdings would cost. */
+export function estimateCredits(holdings) {
+  return new Set(
+    holdings.filter((h) => !yahooSymbolFor(h)).map((h) => priceKey(h.exchange, h.symbol))
+  ).size;
 }

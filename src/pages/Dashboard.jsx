@@ -4,13 +4,15 @@ import { Link } from 'react-router-dom';
 const TrendChart = lazy(() => import('@/components/TrendChart'));
 import {
   Panel, PanelTitle, StatCard, StackedBar, LegendRow, Meter, Ring,
-  InitialBadge, Icon, EmptyState,
+  InitialBadge, Icon, IconBadge, EmptyState,
 } from '@/components/ui/design';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/PageHeader';
 import { MonthField } from '@/components/ui/date-fields';
 import useStore from '@/store/useStore';
 import { useT, useDateFormat } from '@/hooks/useT';
+import usePortfolio from '@/hooks/usePortfolio';
+import usePrices from '@/hooks/usePrices';
 import { useMonthFilter } from '@/hooks/useCycle';
 import { getAllCategories } from '@/lib/constants';
 import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
@@ -34,6 +36,10 @@ export default function Dashboard() {
   const transactions = useStore((s) => s.transactions);
   const accounts = useStore((s) => s.accounts);
   const customCategories = useStore((s) => s.customCategories);
+  const hasHoldings = useStore((s) => s.holdings.length > 0);
+  const portfolio = usePortfolio();
+  // Mounted for its auto-refresh, so the investment tile stays current.
+  usePrices();
 
   const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
   const monthTx = useMemo(
@@ -284,6 +290,26 @@ export default function Dashboard() {
                 </div>
               </Link>
             ))}
+            {hasHoldings && (
+              <Link
+                to="/portfolio"
+                className="flex items-center gap-3 rounded-[14px] bg-background p-3 transition-colors hover:bg-secondary/60"
+              >
+                <IconBadge name="trending_up" tone="teal" size={38} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold">{t('accounts.investments')}</div>
+                  <div className={cn(
+                    'truncate text-[11px] tabular-nums',
+                    portfolio.pl >= 0 ? 'text-primary' : 'text-danger'
+                  )}>
+                    {portfolio.pl >= 0 ? '+' : ''}{portfolio.plPct.toFixed(2)}%
+                  </div>
+                </div>
+                <div className="text-[13px] font-bold tabular-nums text-teal">
+                  {formatCurrency(portfolio.marketValue)}
+                </div>
+              </Link>
+            )}
           </div>
         </Panel>
       </div>

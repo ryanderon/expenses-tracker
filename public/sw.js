@@ -1,4 +1,4 @@
-const CACHE_NAME = 'penny-v2';
+const CACHE_NAME = 'penny-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -6,6 +6,7 @@ const ASSETS_TO_CACHE = [
   '/favicon.svg',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',
+  '/icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -29,6 +30,14 @@ self.addEventListener('fetch', (event) => {
 
   // Skip non-GET and chrome-extension requests
   if (request.method !== 'GET' || request.url.startsWith('chrome-extension')) return;
+
+  const url = new URL(request.url);
+
+  // Dev servers change modules on every edit; caching them mixes old and new.
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return;
+
+  // Live data (stock quotes) must never be served from the cache.
+  if (url.pathname.startsWith('/api/')) return;
 
   // For navigation requests, try network first then fall back to cached index.html
   if (request.mode === 'navigate') {

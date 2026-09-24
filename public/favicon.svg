@@ -1,4 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#6b7d4a"/>
-  <text x="16" y="22" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="bold" fill="#faf8f5">P</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00863b"/>
+      <stop offset="1" stop-color="#007b7e"/>
+    </linearGradient>
+    <linearGradient id="coin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7c67f"/>
+      <stop offset="1" stop-color="#d27a36"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <circle cx="256" cy="264" r="186" fill="#000" fill-opacity=".14"/>
+  <circle cx="256" cy="256" r="186" fill="url(#coin)"/>
+  <circle cx="256" cy="256" r="174" fill="none" stroke="#b5652a" stroke-opacity=".45" stroke-width="12" pathLength="360" stroke-dasharray="1.4 2.2"/>
+  <circle cx="256" cy="256" r="146" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="8"/>
+  <g transform="translate(256 262) scale(.56) translate(-256 -256)">
+    <path d="M148 210h72v164a36 36 0 0 1-72 0z" fill="#a8551f" fill-opacity=".45"/>
+    <circle cx="256" cy="210" r="72" fill="none" stroke="#a8551f" stroke-opacity=".45" stroke-width="72"/>
+  </g>
+  <g transform="translate(256 256) scale(.56) translate(-256 -256)">
+    <path d="M148 210h72v164a36 36 0 0 1-72 0z" fill="#fff"/>
+    <circle cx="256" cy="210" r="72" fill="none" stroke="#fff" stroke-width="72"/>
+  </g>
 </svg>

@@ -353,6 +353,13 @@ export default {
     deleteConfirm: 'Delete this account? Its transactions stay.',
     emptyTitle: 'No accounts yet',
     emptyBody: 'Add one to start tracking balances.',
+    netWorth: 'Total wealth',
+    cash: 'In accounts',
+    investments: 'Investments',
+    investmentsType: 'Stocks · {count} holding(s)',
+    investmentsValue: 'Worth now',
+    investmentsHint: 'Follows market prices. Manage it on the Investments page.',
+    investmentsPending: 'Not priced yet — counted at cost',
   },
 
   categories: {
@@ -443,7 +450,7 @@ export default {
     effort: 'How deep to think',
     effortHint: 'Deeper means more thorough, but it burns more tokens.',
     pricesTitle: 'Stock prices',
-    pricesBody: 'Used to update your investments, with your own Twelve Data API key.',
+    pricesBody: 'Only needed for US stocks. IDX and other markets are priced from Yahoo Finance without a key.',
     pricesKey: 'Twelve Data API key',
     pricesGetKey: 'Get a free API key from Twelve Data',
     pricesBudget: 'Auto-updates at most {perDay}x a day, at least 6 hours apart. Manual refresh is always allowed.',
@@ -564,11 +571,12 @@ export default {
 
     partialPrices: 'Only {priced} of {total} have a price so far.',
     noRate: "{count} holding(s) left out — no exchange rate yet.",
-    budgetLine: 'Auto-updates {used}/{perDay} today · {credits} credits per update',
+    budgetLine: 'Twelve Data auto-updates {used}/{perDay} today · {credits} credits per update',
+    yahooLine: 'IDX prices from Yahoo Finance, delayed about 10 minutes.',
 
-    setupTitle: 'Hook up your Twelve Data API key',
+    setupTitle: 'US stocks need a Twelve Data API key',
     setupBody:
-      'Prices come from Twelve Data using your own API key. The free plan gives 800 credits a day — we use a handful.',
+      'IDX stocks work without one. For US tickers, add your own Twelve Data key — the free plan gives 800 credits a day and we use a handful.',
     setupAction: 'Add API key',
 
     emptyTitle: 'No investments yet',
@@ -579,8 +587,9 @@ export default {
     errNoKey: 'No Twelve Data API key yet. Add one in Settings.',
     errKey: 'Twelve Data rejected that API key. Check it in Settings.',
     errQuota: "You're out of Twelve Data credits for today. Try tomorrow.",
-    errPlan: "Your Twelve Data plan doesn't cover this exchange.",
-    errSymbol: "Twelve Data doesn't have that ticker.",
+    errPlan: "Twelve Data's free plan only covers US stocks, and this exchange isn't one we can price from Yahoo.",
+    errSymbol: "Couldn't find a price for that ticker.",
+    errYahoo: "Couldn't get prices from Yahoo Finance. Try again in a bit.",
     errConnection: "Couldn't reach Twelve Data. Check your connection.",
     errGeneric: 'Could not fetch prices.',
   },

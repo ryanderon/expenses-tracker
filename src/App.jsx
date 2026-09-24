@@ -28,6 +28,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Icon } from "@/components/ui/design";
+import Logo from "@/components/Logo";
 import Dashboard from "@/pages/Dashboard";
 import Today from "@/pages/Today";
 import Transactions from "@/pages/Transactions";
@@ -97,9 +98,7 @@ function SidebarBrand({ onEditName, onNavigate }) {
 
   return (
     <div className="flex items-center gap-3 px-5 pb-[18px] pt-[22px]">
-      <div className="flex size-[38px] shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[var(--teal)] shadow-[0_4px_12px_var(--primary-soft)]">
-        <span className="text-base font-extrabold text-primary-foreground">P</span>
-      </div>
+      <Logo size={38} className="shrink-0 drop-shadow-[0_4px_12px_var(--primary-soft)]" />
       <div className="min-w-0">
         <div className="text-[17px] font-extrabold tracking-[-0.02em]">Penny</div>
         {userName && (
@@ -432,9 +431,7 @@ function HydrationGate({ children }) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[var(--teal)]">
-            <span className="text-lg font-extrabold text-primary-foreground">P</span>
-          </div>
+          <Logo size={48} />
           <Icon name="progress_activity" size={18} className="animate-spin text-muted-foreground" />
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,12 +8,129 @@ import {
 } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import CurrencyInput from '@/components/ui/currency-input';
-import { Icon, InitialBadge, EmptyState } from '@/components/ui/design';
+import {
+  Icon, IconBadge, InitialBadge, EmptyState, Panel, StackedBar, LegendRow,
+} from '@/components/ui/design';
 import PageHeader from '@/components/PageHeader';
 import useStore from '@/store/useStore';
-import { useT } from '@/hooks/useT';
+import { useT, useDateFormat } from '@/hooks/useT';
+import usePortfolio from '@/hooks/usePortfolio';
+import usePrices from '@/hooks/usePrices';
 import { ACCOUNT_COLORS, getAllCategories } from '@/lib/constants';
 import { formatCurrency, getAccountBalance, cn } from '@/lib/utils';
+
+/** Share of `part` in `total`, or null when a negative balance makes it meaningless. */
+function share(part, total, other) {
+  if (part < 0 || other < 0 || total <= 0) return null;
+  return Math.round((part / total) * 100);
+}
+
+function NetWorthPanel({ cash, portfolio, hasHoldings }) {
+  const t = useT();
+  const invested = hasHoldings ? portfolio.marketValue : 0;
+  const total = cash + invested;
+
+  return (
+    <Panel className="mb-4">
+      <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+        {t('accounts.netWorth')}
+      </p>
+      <p className={cn(
+        'mt-1 text-[28px] font-extrabold tabular-nums tracking-[-0.02em]',
+        total < 0 && 'text-danger'
+      )}>
+        {formatCurrency(total)}
+      </p>
+
+      {hasHoldings && (
+        <>
+          <StackedBar
+            className="mt-4"
+            height={10}
+            segments={[
+              { key: 'cash', value: Math.max(cash, 0), color: 'var(--primary)' },
+              { key: 'investments', value: invested, color: 'var(--teal)' },
+            ]}
+          />
+          <div className="mt-3 flex flex-col gap-2">
+            <LegendRow
+              color="var(--primary)"
+              label={t('accounts.cash')}
+              value={formatCurrency(cash)}
+              pct={share(cash, total, invested)}
+            />
+            <LegendRow
+              color="var(--teal)"
+              label={t('accounts.investments')}
+              value={formatCurrency(invested)}
+              pct={share(invested, total, cash)}
+            />
+          </div>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+/**
+ * Investments as one more "account" — read-only here, since its value comes
+ * from market prices rather than transactions. Tapping through edits it.
+ */
+function InvestmentCard({ portfolio }) {
+  const t = useT();
+  const dates = useDateFormat();
+  const up = portfolio.pl >= 0;
+  const priced = portfolio.pricedCount > 0;
+
+  return (
+    <Link
+      to="/portfolio"
+      className="group relative rounded-[20px] border border-border bg-card p-5 shadow-[var(--shadow-card)] transition-colors hover:border-teal/50"
+    >
+      <div className="mb-4 flex items-center gap-3">
+        <IconBadge name="trending_up" tone="teal" size={48} className="rounded-[14px]" />
+        <div className="min-w-0">
+          <div className="truncate text-[15px] font-bold">{t('accounts.investments')}</div>
+          <div className="truncate text-xs text-muted-foreground">
+            {t('accounts.investmentsType', { count: portfolio.totalCount })}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <div className="text-[11px] text-muted-foreground">{t('accounts.investmentsValue')}</div>
+          <div className="text-lg font-extrabold tabular-nums text-teal">
+            {formatCurrency(portfolio.marketValue)}
+          </div>
+        </div>
+        <div className="text-right text-xs">
+          {priced ? (
+            <>
+              <div className={cn('font-bold tabular-nums', up ? 'text-primary' : 'text-danger')}>
+                {up ? '+' : '−'}{formatCurrency(Math.abs(portfolio.pl))}{' '}
+                ({up ? '+' : ''}{portfolio.plPct.toFixed(2)}%)
+              </div>
+              {portfolio.quotedAt && (
+                <div className="text-[11px] text-muted-foreground">
+                  {t('common.ago', { time: dates.distance(portfolio.quotedAt) })}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-[11px] text-muted-foreground">{t('accounts.investmentsPending')}</div>
+          )}
+        </div>
+      </div>
+
+      <Icon
+        name="chevron_right"
+        size={20}
+        className="absolute right-3 top-3 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+      />
+    </Link>
+  );
+}
 
 const INITIAL_FORM = { name: '', type: '', color: ACCOUNT_COLORS[0], openingBalance: '' };
 
@@ -118,6 +236,12 @@ export default function Accounts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
+  const holdings = useStore((s) => s.holdings);
+  const portfolio = usePortfolio();
+  // Mounted for its auto-refresh, so the investment figure here stays current.
+  usePrices();
+  const hasHoldings = holdings.length > 0;
+
   const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
 
   const rows = useMemo(
@@ -155,7 +279,15 @@ export default function Accounts() {
         }
       />
 
-      {rows.length > 0 ? (
+      {(rows.length > 0 || hasHoldings) && (
+        <NetWorthPanel
+          cash={rows.reduce((sum, a) => sum + a.balance, 0)}
+          portfolio={portfolio}
+          hasHoldings={hasHoldings}
+        />
+      )}
+
+      {rows.length > 0 || hasHoldings ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((acc) => (
             <div
@@ -220,6 +352,7 @@ export default function Accounts() {
               </div>
             </div>
           ))}
+          {hasHoldings && <InvestmentCard portfolio={portfolio} />}
         </div>
       ) : (
         <EmptyState

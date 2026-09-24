@@ -355,6 +355,13 @@ export default {
     deleteConfirm: 'Hapus akun ini? Transaksinya tetap kesimpan.',
     emptyTitle: 'Belum ada akun',
     emptyBody: 'Tambah satu rekening buat mulai pantau saldo.',
+    netWorth: 'Total kekayaan',
+    cash: 'Di rekening',
+    investments: 'Investasi',
+    investmentsType: 'Saham · {count} aset',
+    investmentsValue: 'Nilai sekarang',
+    investmentsHint: 'Ikut harga pasar. Atur di halaman Investasi.',
+    investmentsPending: 'Harga belum kebaca — dihitung pakai modal',
   },
 
   categories: {
@@ -445,7 +452,7 @@ export default {
     effort: 'Seberapa dalam',
     effortHint: 'Makin dalam makin teliti, tapi token kepakai lebih banyak.',
     pricesTitle: 'Harga saham',
-    pricesBody: 'Buat update nilai investasi, pakai API key Twelve Data punya kamu.',
+    pricesBody: 'Cuma perlu buat saham US. Saham IDX dan bursa lain harganya diambil dari Yahoo Finance tanpa key.',
     pricesKey: 'API key Twelve Data',
     pricesGetKey: 'Ambil API key gratis di Twelve Data',
     pricesBudget: 'Update otomatis maksimal {perDay}x sehari, minimal 6 jam sekali. Tombol update manual bebas kapan aja.',
@@ -567,11 +574,12 @@ export default {
 
     partialPrices: 'Baru {priced} dari {total} yang kebaca harganya.',
     noRate: '{count} aset belum kehitung karena kurs-nya belum ada.',
-    budgetLine: 'Update otomatis {used}/{perDay} hari ini · {credits} kredit sekali update',
+    budgetLine: 'Update otomatis Twelve Data {used}/{perDay} hari ini · {credits} kredit sekali update',
+    yahooLine: 'Harga IDX dari Yahoo Finance, telat sekitar 10 menit.',
 
-    setupTitle: 'Sambungin API key Twelve Data',
+    setupTitle: 'Saham US butuh API key Twelve Data',
     setupBody:
-      'Harga saham diambil pakai API key Twelve Data punya kamu. Paket gratisnya 800 kredit sehari — kita cuma pakai beberapa.',
+      'Saham IDX udah jalan tanpa key. Buat saham US, tambahin API key Twelve Data kamu — paket gratisnya 800 kredit sehari, kita cuma pakai beberapa.',
     setupAction: 'Tambah API key',
 
     emptyTitle: 'Belum ada investasi',
@@ -582,8 +590,9 @@ export default {
     errNoKey: 'Belum ada API key Twelve Data. Tambahin di Pengaturan.',
     errKey: 'API key Twelve Data-nya ditolak. Cek lagi di Pengaturan.',
     errQuota: 'Kredit Twelve Data hari ini udah habis. Coba lagi besok.',
-    errPlan: 'Paket Twelve Data kamu belum nyakup bursa ini.',
-    errSymbol: 'Sahamnya nggak ketemu di Twelve Data.',
+    errPlan: 'Paket gratis Twelve Data cuma nyakup saham US, dan bursa ini belum bisa diambil dari Yahoo.',
+    errSymbol: 'Harga saham ini nggak ketemu.',
+    errYahoo: 'Gagal ambil harga dari Yahoo Finance. Coba lagi bentar.',
     errConnection: 'Nggak bisa nyambung ke Twelve Data. Cek koneksi kamu.',
     errGeneric: 'Gagal ambil harga.',
   },

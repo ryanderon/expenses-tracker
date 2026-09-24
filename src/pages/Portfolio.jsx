@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
@@ -17,8 +17,8 @@ import CurrencyInput from '@/components/ui/currency-input';
 import useStore from '@/store/useStore';
 import usePrices from '@/hooks/usePrices';
 import { useT, useDateFormat } from '@/hooks/useT';
-import { searchSymbols, lotSizeFor, priceKey } from '@/lib/prices';
-import { buildPortfolio } from '@/lib/portfolio';
+import { searchSymbols, lotSizeFor, priceKey, yahooSymbolFor } from '@/lib/prices';
+import usePortfolio from '@/hooks/usePortfolio';
 import PageHeader from '@/components/PageHeader';
 import { DateField } from '@/components/ui/date-fields';
 import { cn } from '@/lib/utils';
@@ -420,25 +420,19 @@ export default function Portfolio() {
   const [addOpen, setAddOpen] = useState(false);
 
   const holdings = useStore((s) => s.holdings);
-  const priceCache = useStore((s) => s.priceCache);
-  const priceRates = useStore((s) => s.priceRates);
-  const baseCurrency = useStore((s) => s.priceMeta.baseCurrency) || 'IDR';
-
   const prices = usePrices();
-
-  const portfolio = useMemo(
-    () => buildPortfolio(holdings, priceCache, priceRates, baseCurrency),
-    [holdings, priceCache, priceRates, baseCurrency]
-  );
+  const portfolio = usePortfolio();
+  const { baseCurrency } = portfolio;
 
   const hasHoldings = holdings.length > 0;
+  const usesYahoo = holdings.some((h) => yahooSymbolFor(h));
 
   return (
     <>
       <PageHeader
         actions={
           <>
-          {hasHoldings && prices.hasKey && (
+          {hasHoldings && (
             <Button
               variant="outline"
               size="sm"
@@ -459,7 +453,7 @@ export default function Portfolio() {
       />
       <div className="flex flex-col gap-4">
 
-      {!prices.hasKey && (
+      {!prices.hasKey && prices.needsKey && (
         <Card className="border-dashed">
           <CardContent className="pt-6 pb-6 flex flex-col items-center gap-3 text-center">
             <div className="size-11 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -525,8 +519,14 @@ export default function Portfolio() {
               </p>
             )}
 
-            {prices.hasKey && (
+            {usesYahoo && (
               <p className="mt-3 text-[11px] text-muted-foreground">
+                {t('portfolio.yahooLine')}
+              </p>
+            )}
+
+            {prices.creditsPerRefresh > 0 && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
                 {t('portfolio.budgetLine', {
                   used: prices.usedToday,
                   perDay: prices.perDay,
