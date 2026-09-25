@@ -245,7 +245,7 @@ export default {
 
   insights: {
     title: 'Insights',
-    subtitle: 'Ask Claude about your spending — it reads your real numbers',
+    subtitle: 'What your numbers are saying, plus Claude when you want to dig in',
     beta: 'Beta',
     analysing: 'Looking at {period}',
     askPlaceholder: 'Ask anything about {period}',
@@ -294,6 +294,95 @@ export default {
     errConnection: "Couldn't reach Claude. Check your connection.",
     errRefusal: "Claude wouldn't answer that one.",
     cancelled: 'Cancelled.',
+
+    tabSummary: 'Summary',
+    tabAi: 'Ask AI',
+    summaryEmpty: 'No spending recorded in this period yet.',
+    insightsHeading: 'What stands out',
+    nothingToFlag: 'Nothing worth flagging yet — keep logging and patterns will show up here.',
+    howItWorks: 'Worked out on your device from your own history — no AI, no API key.',
+
+    health: {
+      title: 'Financial health',
+      basisPeriod: 'Based on this period',
+      basisTrailing: 'Based on your last {count} full months',
+      basisPartial: 'Based on this month so far',
+      notEnough: 'Log some income and spending to get a score.',
+      months: '{count} mo',
+      grades: {
+        great: 'Looking great',
+        good: 'Solid',
+        fair: 'Could be better',
+        weak: 'Needs attention',
+      },
+      components: {
+        savings: { label: 'Savings rate', hint: 'Of income set aside · aim for 20%+' },
+        spending: { label: 'Spending vs income', hint: 'Of income spent · aim for 50% or less' },
+        fixed: { label: 'Fixed costs', hint: 'Of income locked in · aim for 30% or less' },
+        budget: { label: 'Budgets on track', hint: 'Categories within their limit' },
+        runway: { label: 'Cash runway', hint: 'Months your cash covers · aim for 6' },
+      },
+    },
+
+    rules: {
+      paceUpTitle: 'Spending is running hot',
+      paceUpToDate: "You've spent {amount} so far — {pct}% more than you usually have by this point ({usual}).",
+      paceUp: 'You spent {amount} this period, {pct}% above your recent average of {usual}.',
+      paceDownTitle: 'Spending is lighter than usual',
+      paceDownToDate: "You've spent {amount} so far — {pct}% less than you usually have by this point ({usual}).",
+      paceDown: 'You spent {amount} this period, {pct}% below your recent average of {usual}.',
+      paceSteadyTitle: 'Spending is on your usual track',
+      paceSteadyToDate: "You've spent {amount} so far, close to your usual {usual} by this point.",
+      paceSteady: 'You spent {amount} this period, close to your recent average of {usual}.',
+      projection: 'At your usual rhythm, the period ends around {amount}.',
+
+      budgetOverTitle: '{category} is over budget',
+      budgetOver: '{category} is {amount} past its {limit} limit.',
+      budgetTrendingTitle: '{category} is heading over',
+      budgetTrending: 'At this pace {category} ends near {projected} against a {limit} limit. Keep it to about {daily}/day from here.',
+      budgetOkTitle: 'Budgets are on track',
+      budgetOkToDate: 'Every budgeted category is on pace. You can spend about {daily} a day and still land within budget.',
+      budgetOk: 'Every budgeted category stayed within its limit, with {amount} left over.',
+
+      subUpTitle: '{name} is up',
+      subUp: '{name} is at {amount}, {pct}% more than usual ({usual}) — {delta} extra.',
+      subNewTitle: 'New spending on {name}',
+      subNew: '{name} is at {amount}; it is usually close to nothing by now.',
+      subDownTitle: '{name} is down',
+      subDown: '{name} is at {amount}, {delta} less than your usual {usual}. Nice.',
+
+      savingsRateTitle: 'Saving {pct}% of income',
+      savingsRate: "You've put {amount} ({pct}% of income) into savings and investments.",
+      savingsRateUp: 'Up from your average of {pct}%.',
+      savingsRateDown: 'Down from your average of {pct}%.',
+      deficitTitle: 'Spending more than you earn',
+      deficit: 'Spending is {expense} against {income} of income — {gap} is coming out of your balances.',
+      noIncomeTitle: 'No income logged',
+      noIncome: "There's no income in this period, so savings rate and spending ratio can't be worked out.",
+
+      fixedTitle: 'About {amount}/month is fixed',
+      fixed: "That's {pct}% of your income going to regular bills like {names}.",
+      fixedNoIncome: 'Regular bills like {names} come back every month at almost the same amount.',
+
+      cutTitle: 'Room to save ~{amount}/month',
+      cut: 'Targets are taken from your own cheaper months, so they are levels you have already lived at.',
+      cutItem: '{target} instead of {avg} on average',
+
+      smallTitle: '{count} small purchases add up',
+      small: '{count} purchases under {limit} total {amount} — {pct}% of this period’s spending.',
+
+      weekendTitle: 'Weekends cost {ratio}× more',
+      weekend: 'Over the last 8 weeks you spend about {weekend} a day on weekends vs {weekday} on weekdays.',
+
+      outlierTitle: 'One purchase is {ratio}× your usual',
+      outlier: '{name} came to {amount}; a typical {category} purchase is about {usual}.',
+
+      concentrationTitle: '{pct}% of spending is {name}',
+      concentration: '{name} accounts for {amount} this period — the first place to look if you want to cut back.',
+
+      noSpendTitle: '{count} no-spend days',
+      noSpend: "You didn't spend anything on {count} of {days} days this period.",
+    },
   },
 
   reports: {
@@ -520,7 +609,7 @@ export default {
     budgetBody:
       'Set a limit once on the Every month tab and it sticks.',
     insightsTitle: 'Insights',
-    insightsBody: 'Ask Claude about your spending. You need your own API key.',
+    insightsBody: 'Patterns from your own history, worked out on your device. Ask Claude for more with your own API key.',
     moreTitle: 'Everything else',
     moreBody: 'Reports, accounts, categories, split bill, and settings are all here.',
   },

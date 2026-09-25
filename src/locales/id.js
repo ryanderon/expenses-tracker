@@ -247,7 +247,7 @@ export default {
 
   insights: {
     title: 'Insight',
-    subtitle: 'Tanya Claude soal pengeluaran kamu — dia baca angka aslinya',
+    subtitle: 'Apa kata angka-angkamu, plus Claude kalau mau gali lebih dalam',
     beta: 'Beta',
     analysing: 'Lagi lihat {period}',
     askPlaceholder: 'Tanya apa aja soal {period}',
@@ -296,6 +296,95 @@ export default {
     errConnection: 'Nggak bisa nyambung ke Claude. Cek koneksi kamu.',
     errRefusal: 'Claude nggak mau jawab yang ini.',
     cancelled: 'Dibatalin.',
+
+    tabSummary: 'Ringkasan',
+    tabAi: 'Tanya AI',
+    summaryEmpty: 'Belum ada pengeluaran di periode ini.',
+    insightsHeading: 'Yang perlu kamu tahu',
+    nothingToFlag: 'Belum ada yang menonjol. Terus catat ya, nanti polanya kelihatan di sini.',
+    howItWorks: 'Dihitung langsung di HP kamu dari riwayatmu sendiri. Tanpa AI, tanpa API key.',
+
+    health: {
+      title: 'Kesehatan keuangan',
+      basisPeriod: 'Dari periode ini',
+      basisTrailing: 'Dari {count} bulan penuh terakhir',
+      basisPartial: 'Dari bulan ini sejauh ini',
+      notEnough: 'Catat pemasukan dan pengeluaran dulu biar skornya keluar.',
+      months: '{count} bln',
+      grades: {
+        great: 'Mantap banget',
+        good: 'Udah oke',
+        fair: 'Masih bisa lebih baik',
+        weak: 'Perlu diperhatiin',
+      },
+      components: {
+        savings: { label: 'Rasio nabung', hint: 'Dari pemasukan yang disisihin · idealnya 20%+' },
+        spending: { label: 'Pengeluaran vs pemasukan', hint: 'Dari pemasukan yang kepakai · idealnya ≤50%' },
+        fixed: { label: 'Biaya tetap', hint: 'Dari pemasukan yang udah keikat · idealnya ≤30%' },
+        budget: { label: 'Anggaran aman', hint: 'Kategori yang masih dalam batas' },
+        runway: { label: 'Dana darurat', hint: 'Saldo cukup buat berapa bulan · idealnya 6' },
+      },
+    },
+
+    rules: {
+      paceUpTitle: 'Belanja lagi kenceng',
+      paceUpToDate: 'Sampai hari ini kamu udah keluar {amount}, {pct}% lebih banyak dari biasanya di tanggal segini ({usual}).',
+      paceUp: 'Periode ini kamu keluar {amount}, {pct}% di atas rata-rata kamu ({usual}).',
+      paceDownTitle: 'Belanja lebih irit dari biasanya',
+      paceDownToDate: 'Sampai hari ini kamu udah keluar {amount}, {pct}% lebih sedikit dari biasanya di tanggal segini ({usual}).',
+      paceDown: 'Periode ini kamu keluar {amount}, {pct}% di bawah rata-rata kamu ({usual}).',
+      paceSteadyTitle: 'Belanja masih di jalur biasa',
+      paceSteadyToDate: 'Sampai hari ini kamu udah keluar {amount}, mirip sama biasanya di tanggal segini ({usual}).',
+      paceSteady: 'Periode ini kamu keluar {amount}, mirip sama rata-rata kamu ({usual}).',
+      projection: 'Kalau ritmenya kayak biasa, akhir periode bakal sekitar {amount}.',
+
+      budgetOverTitle: '{category} udah jebol',
+      budgetOver: '{category} udah lewat {amount} dari batas {limit}.',
+      budgetTrendingTitle: '{category} bakal lewat batas',
+      budgetTrending: 'Kalau begini terus, {category} bakal nyampe {projected} padahal batasnya {limit}. Coba tahan di {daily}/hari mulai sekarang.',
+      budgetOkTitle: 'Anggaran masih aman',
+      budgetOkToDate: 'Semua kategori masih sesuai jalur. Kamu bisa keluar sekitar {daily} per hari dan tetap aman.',
+      budgetOk: 'Semua kategori tetap dalam batas, masih sisa {amount}.',
+
+      subUpTitle: '{name} naik',
+      subUp: '{name} udah {amount}, {pct}% lebih tinggi dari biasanya ({usual}). Kelebihan {delta}.',
+      subNewTitle: 'Ada pengeluaran baru: {name}',
+      subNew: '{name} udah {amount}, padahal biasanya hampir nggak ada di tanggal segini.',
+      subDownTitle: '{name} turun',
+      subDown: '{name} baru {amount}, {delta} lebih hemat dari biasanya ({usual}). Mantap.',
+
+      savingsRateTitle: 'Nabung {pct}% dari pemasukan',
+      savingsRate: 'Kamu udah sisihin {amount} ({pct}% pemasukan) ke tabungan dan investasi.',
+      savingsRateUp: 'Naik dari rata-rata kamu {pct}%.',
+      savingsRateDown: 'Turun dari rata-rata kamu {pct}%.',
+      deficitTitle: 'Pengeluaran lebih besar dari pemasukan',
+      deficit: 'Keluar {expense}, masuk cuma {income}. Selisih {gap} ketutup dari saldo kamu.',
+      noIncomeTitle: 'Belum ada pemasukan',
+      noIncome: 'Nggak ada pemasukan tercatat di periode ini, jadi rasio nabung dan pengeluaran belum bisa dihitung.',
+
+      fixedTitle: 'Sekitar {amount}/bulan udah pasti keluar',
+      fixed: 'Itu {pct}% dari pemasukan kamu, buat tagihan rutin kayak {names}.',
+      fixedNoIncome: 'Tagihan rutin kayak {names} muncul tiap bulan dengan jumlah yang hampir sama.',
+
+      cutTitle: 'Bisa hemat ~{amount}/bulan',
+      cut: 'Targetnya diambil dari bulan-bulan paling hemat kamu sendiri, jadi udah kebukti bisa.',
+      cutItem: '{target}, biasanya rata-rata {avg}',
+
+      smallTitle: '{count} jajan kecil numpuk',
+      small: '{count} transaksi di bawah {limit} totalnya {amount}, {pct}% dari pengeluaran periode ini.',
+
+      weekendTitle: 'Weekend {ratio}× lebih boros',
+      weekend: '8 minggu terakhir, rata-rata kamu keluar {weekend} per hari pas weekend, vs {weekday} di hari kerja.',
+
+      outlierTitle: 'Ada transaksi {ratio}× dari biasanya',
+      outlier: '{name} habis {amount}, padahal biasanya {category} cuma sekitar {usual}.',
+
+      concentrationTitle: '{pct}% pengeluaran ke {name}',
+      concentration: '{name} nyedot {amount} periode ini. Kalau mau ngirit, mulai dari sini.',
+
+      noSpendTitle: '{count} hari tanpa jajan',
+      noSpend: 'Ada {count} dari {days} hari di periode ini kamu nggak keluar uang sama sekali.',
+    },
   },
 
   reports: {
@@ -523,7 +612,7 @@ export default {
       'Atur batasnya sekali di tab Tiap bulan, nanti otomatis kepakai terus.',
     insightsTitle: 'Insight',
     insightsBody:
-      'Tanya Claude soal pengeluaran kamu. Perlu API key sendiri ya.',
+      'Pola dari riwayatmu sendiri, dihitung langsung di HP. Mau lebih dalam? Tanya Claude pakai API key sendiri.',
     moreTitle: 'Sisanya',
     moreBody: 'Laporan, akun, kategori, patungan, sama pengaturan ada di sini.',
   },

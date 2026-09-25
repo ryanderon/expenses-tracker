@@ -241,7 +241,7 @@ export default function Transactions() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('transactions.searchPlaceholder')}
-              className="h-9 border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
+              className="h-9 border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
             />
           </div>
 

@@ -22,6 +22,7 @@ import { buildFinancialSnapshot, buildContextMessage, QUICK_PROMPTS } from '@/li
 import { generateId, getMonthKey } from '@/lib/utils';
 import { useT, useDateFormat } from '@/hooks/useT';
 import PageHeader from '@/components/PageHeader';
+import InsightsSummary from '@/components/InsightsSummary';
 
 const PROMPT_ICONS = {
   chart: ChartNoAxesCombined,
@@ -90,6 +91,7 @@ export default function Insights() {
   const setAiSettings = useStore((s) => s.setAiSettings);
   const transactions = useStore((s) => s.transactions);
 
+  const [mode, setMode] = useState('summary');
   const [scopeType, setScopeType] = useState('month');
   const [scopeMonth, setScopeMonth] = useState(getMonthKey(new Date()));
   const [scopeYear, setScopeYear] = useState(String(new Date().getFullYear()));
@@ -191,13 +193,9 @@ export default function Insights() {
     <>
       <div data-tour="insights-header">
       <PageHeader
-        title={
-          <span className="flex items-center gap-2">
-            {t('insights.title')}
-            <Badge variant="secondary" className="text-[10px]">{t('insights.beta')}</Badge>
-          </span>
-        }
-        actions={hasKey && (
+        actions={mode === 'summary' ? (
+          <MonthField value={scopeMonth} onChange={(v) => { setScopeMonth(v); resetThread(); }} />
+        ) : hasKey && (
           <div className="flex items-center gap-2">
             <SegmentedTabs
               value={scopeType}
@@ -228,9 +226,28 @@ export default function Insights() {
       </div>
 
       <div className="flex flex-col gap-4">
-      {!hasKey && <SetupPrompt />}
+      <SegmentedTabs
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: 'summary', label: t('insights.tabSummary') },
+          {
+            value: 'ai',
+            label: (
+              <span className="flex items-center gap-1.5">
+                {t('insights.tabAi')}
+                <Badge variant="secondary" className="px-1.5 text-[9px]">{t('insights.beta')}</Badge>
+              </span>
+            ),
+          },
+        ]}
+      />
 
-      {hasKey && !hasData && (
+      {mode === 'summary' && <InsightsSummary monthKey={scopeMonth} />}
+
+      {mode === 'ai' && !hasKey && <SetupPrompt />}
+
+      {mode === 'ai' && hasKey && !hasData && (
         <Card className="border-dashed">
           <CardContent className="pt-8 pb-8 text-center">
             <p className="text-sm text-muted-foreground">
@@ -240,7 +257,7 @@ export default function Insights() {
         </Card>
       )}
 
-      {hasKey && hasData && (
+      {mode === 'ai' && hasKey && hasData && (
         <>
           {/* Quick prompts */}
           {turns.length === 0 && !isStreaming && (

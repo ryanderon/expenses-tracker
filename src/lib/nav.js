@@ -25,7 +25,7 @@ export const NAV_ITEMS = [
  * button; these four plus that button make up the bottom bar.
  */
 export const MOBILE_NAV = NAV_ITEMS.filter((i) =>
-  ['/', '/transactions', '/budget', '/insights'].includes(i.to)
+  ['/', '/transactions', '/budget', '/today'].includes(i.to)
 );
 
 /** Page subtitles, as written in the design's `titles` map. */
