@@ -19,7 +19,9 @@ import {
 import useStore from '@/store/useStore';
 import { useBackup } from '@/hooks/useGoogleBackup';
 import { verifyApiKey, describeAiError } from '@/lib/ai';
-import { AI_MODELS, EFFORT_LEVELS } from '@/lib/aiModels';
+import {
+  AI_PROVIDERS, EFFORT_LEVELS, getModelInfo, getProviderInfo, modelsFor,
+} from '@/lib/aiModels';
 import { PRICE_BUDGET } from '@/lib/prices';
 import { getStorageSize } from '@/lib/idbStorage';
 import { exportToExcel } from '@/lib/excel';
@@ -154,11 +156,12 @@ function Section({ icon: Icon, title, description, children }) {
   );
 }
 
-function AiSection() {
-  const aiSettings = useStore((s) => s.aiSettings);
-  const setAiSettings = useStore((s) => s.setAiSettings);
+/** Keyed by provider in the parent, so the draft resets when the provider changes. */
+function AiKeyField({ provider }) {
+  const savedKey = useStore((s) => s.aiSettings.apiKeys?.[provider.id] || '');
+  const setAiKey = useStore((s) => s.setAiKey);
 
-  const [draft, setDraft] = useState(aiSettings.apiKey || '');
+  const [draft, setDraft] = useState(savedKey);
   const [show, setShow] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
@@ -169,14 +172,14 @@ function AiSection() {
     setResult(null);
 
     if (!key) {
-      setAiSettings({ apiKey: '' });
+      setAiKey(provider.id, '');
       return;
     }
 
     setVerifying(true);
     try {
-      await verifyApiKey(key);
-      setAiSettings({ apiKey: key });
+      await verifyApiKey(provider.id, key);
+      setAiKey(provider.id, key);
       setResult({ ok: true, message: t('settings.keySaved') });
     } catch (err) {
       setResult({ ok: false, message: t(describeAiError(err)) });
@@ -186,100 +189,135 @@ function AiSection() {
   };
 
   return (
+    <div className="flex flex-col gap-2">
+      <Label className="text-xs">{t(provider.keyLabelKey)}</Label>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Input
+            type={show ? 'text' : 'password'}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={provider.keyPlaceholder}
+            autoComplete="off"
+            spellCheck={false}
+            className="pr-9 font-mono text-xs"
+          />
+          <button
+            type="button"
+            onClick={() => setShow((v) => !v)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label={show ? t('settings.hideKey') : t('settings.showKey')}
+          >
+            {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
+        </div>
+        <Button onClick={save} disabled={verifying || draft.trim() === savedKey}>
+          {verifying ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Check data-icon="inline-start" />}
+          {verifying ? t('settings.verifying') : t('common.save')}
+        </Button>
+      </div>
+
+      {result && (
+        <p className={cn('text-xs flex items-center gap-1', result.ok ? 'text-chart-1' : 'text-destructive')}>
+          {result.ok ? <Check className="size-3" /> : <X className="size-3" />}
+          {result.message}
+        </p>
+      )}
+
+      <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+        <ShieldCheck className="size-3.5 mt-0.5 shrink-0 text-chart-1" />
+        {t('settings.keyPrivacy', { provider: provider.label })}
+      </p>
+
+      <a
+        href={provider.keyUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 w-fit"
+      >
+        {t(provider.getKeyKey)} <ExternalLink className="size-3" />
+      </a>
+    </div>
+  );
+}
+
+function AiSection() {
+  const aiSettings = useStore((s) => s.aiSettings);
+  const setAiSettings = useStore((s) => s.setAiSettings);
+  const t = useT();
+
+  const modelInfo = getModelInfo(aiSettings.model);
+  const provider = getProviderInfo(modelInfo.provider);
+  const models = modelsFor(provider.id);
+
+  return (
     <Section
       icon={Sparkles}
       title={t('settings.aiTitle')}
       description={t('settings.aiBody')}
     >
       <div className="flex flex-col gap-2">
-        <Label className="text-xs">{t('settings.apiKey')}</Label>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Input
-              type={show ? 'text' : 'password'}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="sk-ant-..."
-              autoComplete="off"
-              spellCheck={false}
-              className="pr-9 font-mono text-xs"
-            />
-            <button
-              type="button"
-              onClick={() => setShow((v) => !v)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={show ? t('settings.hideKey') : t('settings.showKey')}
-            >
-              {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          </div>
-          <Button onClick={save} disabled={verifying || draft.trim() === (aiSettings.apiKey || '')}>
-            {verifying ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Check data-icon="inline-start" />}
-            {verifying ? t('settings.verifying') : t('common.save')}
-          </Button>
-        </div>
-
-        {result && (
-          <p className={cn('text-xs flex items-center gap-1', result.ok ? 'text-chart-1' : 'text-destructive')}>
-            {result.ok ? <Check className="size-3" /> : <X className="size-3" />}
-            {result.message}
-          </p>
-        )}
-
-        <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-          <ShieldCheck className="size-3.5 mt-0.5 shrink-0 text-chart-1" />
-          {t('settings.keyPrivacy')}
-        </p>
-
-        <a
-          href="https://console.anthropic.com/settings/keys"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 w-fit"
+        <Label className="text-xs">{t('settings.provider')}</Label>
+        <Select
+          value={provider.id}
+          onValueChange={(v) => setAiSettings({ model: modelsFor(v)[0].id })}
         >
-          {t('settings.getKey')} <ExternalLink className="size-3" />
-        </a>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {AI_PROVIDERS.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.label}{p.free ? ` · ${t('settings.free')}` : ''}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
+
+      <AiKeyField key={provider.id} provider={provider} />
 
       <Separator />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="flex flex-col gap-2">
           <Label className="text-xs">{t('settings.model')}</Label>
-          <Select value={aiSettings.model} onValueChange={(v) => setAiSettings({ model: v })}>
+          <Select value={modelInfo.id} onValueChange={(v) => setAiSettings({ model: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {AI_MODELS.map((m) => (
+                {models.map((m) => (
                   <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
                 ))}
               </SelectGroup>
             </SelectContent>
           </Select>
           <p className="text-[11px] text-muted-foreground">
-            {t(AI_MODELS.find((m) => m.id === aiSettings.model)?.hintKey ?? '')}
+            {t(modelInfo.hintKey)}
           </p>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label className="text-xs">{t('settings.effort')}</Label>
-          <Select
-            value={aiSettings.effort || 'high'}
-            onValueChange={(v) => setAiSettings({ effort: v })}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {EFFORT_LEVELS.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>{t(e.labelKey)}</SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          <p className="text-[11px] text-muted-foreground">
-            {t('settings.effortHint')}
-          </p>
-        </div>
+        {modelInfo.supportsEffort && (
+          <div className="flex flex-col gap-2">
+            <Label className="text-xs">{t('settings.effort')}</Label>
+            <Select
+              value={aiSettings.effort || 'high'}
+              onValueChange={(v) => setAiSettings({ effort: v })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {EFFORT_LEVELS.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{t(e.labelKey)}</SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              {t('settings.effortHint')}
+            </p>
+          </div>
+        )}
       </div>
     </Section>
   );

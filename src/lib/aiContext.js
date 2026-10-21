@@ -8,7 +8,7 @@ import {
 import { buildBudgetReport, shiftMonth, monthLabel } from '@/lib/budget';
 
 /**
- * Builds the JSON snapshot handed to Claude.
+ * Builds the JSON snapshot handed to the model.
  *
  * Raw transactions are deliberately left out — a few thousand rows would blow
  * the context budget and cost the user real money per question. Aggregates

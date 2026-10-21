@@ -26,7 +26,8 @@ const DEFAULT_BUDGET_SETTINGS = {
 };
 
 const DEFAULT_AI_SETTINGS = {
-  apiKey: '',
+  // One key per provider, so switching models never means re-entering a key.
+  apiKeys: { google: '', groq: '', anthropic: '' },
   model: DEFAULT_MODEL,
 };
 
@@ -413,9 +414,16 @@ const useStore = create(
             return { priceCache: rest };
           }),
 
-        // AI settings — the API key stays local and is never exported or synced
+        // AI settings — API keys stay local and are never exported or synced
         setAiSettings: (updates) =>
           set((state) => ({ aiSettings: { ...state.aiSettings, ...updates } })),
+        setAiKey: (provider, key) =>
+          set((state) => ({
+            aiSettings: {
+              ...state.aiSettings,
+              apiKeys: { ...state.aiSettings.apiKeys, [provider]: key },
+            },
+          })),
 
         // Sync settings
         setSyncSettings: (updates) =>
@@ -456,7 +464,7 @@ const useStore = create(
     },
     {
       name: 'penny-storage',
-      version: 6,
+      version: 7,
       storage: createJSONStorage(() => idbStorage),
 
       migrate: (persisted, version) => {
@@ -483,6 +491,18 @@ const useStore = create(
           next.aiSettings = { ...DEFAULT_AI_SETTINGS, ...(next.aiSettings || {}) };
           next.syncSettings = { ...DEFAULT_SYNC_SETTINGS, ...(next.syncSettings || {}) };
           next.dataUpdatedAt = next.dataUpdatedAt || Date.now();
+        }
+        if (version < 7) {
+          // The single Anthropic key became one key per provider. Anyone who
+          // never added a key moves to the free default instead of staying on
+          // a paid model they have no key for.
+          const { apiKey = '', ...rest } = next.aiSettings || {};
+          next.aiSettings = {
+            ...DEFAULT_AI_SETTINGS,
+            ...rest,
+            apiKeys: { ...DEFAULT_AI_SETTINGS.apiKeys, anthropic: apiKey },
+            model: apiKey ? rest.model || DEFAULT_MODEL : DEFAULT_MODEL,
+          };
         }
         return next;
       },

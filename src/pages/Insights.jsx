@@ -17,7 +17,7 @@ import { SegmentedTabs } from '@/components/ui/design';
 import Markdown from '@/components/Markdown';
 import useStore from '@/store/useStore';
 import { streamAnalysis, describeAiError } from '@/lib/ai';
-import { getModelInfo, AI_MODELS } from '@/lib/aiModels';
+import { getModelInfo, getProviderInfo, keyForModel, AI_MODELS } from '@/lib/aiModels';
 import { buildFinancialSnapshot, buildContextMessage, QUICK_PROMPTS } from '@/lib/aiContext';
 import { generateId, getMonthKey } from '@/lib/utils';
 import { useT, useDateFormat } from '@/hooks/useT';
@@ -52,7 +52,7 @@ function SetupPrompt() {
           </Link>
         </Button>
         <a
-          href="https://console.anthropic.com/settings/keys"
+          href={getProviderInfo('google').keyUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
@@ -106,7 +106,10 @@ export default function Insights() {
   const abortRef = useRef(null);
   const bottomRef = useRef(null);
 
-  const hasKey = !!aiSettings.apiKey;
+  const apiKey = keyForModel(aiSettings, aiSettings.model);
+  const hasKey = !!apiKey;
+  // Only offer models the user holds a key for; the rest live in Settings.
+  const usableModels = AI_MODELS.filter((m) => keyForModel(aiSettings, m.id));
   const hasData = transactions.length > 0;
 
   const years = useMemo(() => {
@@ -163,7 +166,7 @@ export default function Insights() {
 
     try {
       const { text, usage: tokens } = await streamAnalysis({
-        apiKey: aiSettings.apiKey,
+        apiKey,
         model: aiSettings.model,
         effort: aiSettings.effort || 'high',
         messages: nextTurns.map((t) => ({
@@ -185,7 +188,7 @@ export default function Insights() {
       setStreamingText('');
       abortRef.current = null;
     }
-  }, [aiSettings, isStreaming, turns, scopeType, scopeMonth, scopeYear, t]);
+  }, [aiSettings, apiKey, isStreaming, turns, scopeType, scopeMonth, scopeYear, t]);
 
   const modelInfo = getModelInfo(aiSettings.model);
 
@@ -401,7 +404,7 @@ export default function Insights() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      {AI_MODELS.map((m) => (
+                      {usableModels.map((m) => (
                         <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
                       ))}
                     </SelectGroup>
