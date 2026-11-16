@@ -79,6 +79,8 @@ function QuickAddForm({ editing, defaultType, onDone }) {
     () => editing?.account || lastUsedAccount || accounts[0]?.id || ''
   );
   const [toAccount, setToAccount] = useState(() => editing?.toAccount || '');
+  // Receivables only: money going out now, or coming back.
+  const [flow, setFlow] = useState(() => (editing?.flow === 'in' ? 'in' : 'out'));
   const [date, setDate] = useState(
     () => editing?.date?.slice(0, 10) || format(new Date(), 'yyyy-MM-dd')
   );
@@ -91,6 +93,7 @@ function QuickAddForm({ editing, defaultType, onDone }) {
   );
 
   const selected = categoryList.find((c) => c.id === category);
+  const isReceivable = selected?.type === 'receivable';
   // Transfers and investments move money between two accounts.
   const needsDestination = category === 'transfer' || category === 'investments';
 
@@ -118,6 +121,8 @@ function QuickAddForm({ editing, defaultType, onDone }) {
       date,
       note: note.trim() || undefined,
       ...(needsDestination ? { toAccount } : {}),
+      // Explicit undefined so editing a repayment into another category clears it.
+      flow: isReceivable && flow === 'in' ? 'in' : undefined,
     };
 
     if (editing) updateTransaction(editing.id, payload);
@@ -140,6 +145,23 @@ function QuickAddForm({ editing, defaultType, onDone }) {
           </ChoicePill>
         ))}
       </div>
+
+      {isReceivable && (
+        <>
+          <FieldLabel>{t('quickAdd.flow')}</FieldLabel>
+          <div className="mb-1.5 flex flex-wrap gap-1.5">
+            <ChoicePill active={flow === 'out'} onClick={() => setFlow('out')}>
+              {t('quickAdd.flowOut')}
+            </ChoicePill>
+            <ChoicePill active={flow === 'in'} onClick={() => setFlow('in')}>
+              {t('quickAdd.flowIn')}
+            </ChoicePill>
+          </div>
+          <p className="mb-4 text-xs text-muted-foreground">
+            {t(flow === 'in' ? 'quickAdd.flowInHint' : 'quickAdd.flowOutHint')}
+          </p>
+        </>
+      )}
 
       <FieldLabel>{t('quickAdd.amount')}</FieldLabel>
       <CurrencyInput
@@ -166,7 +188,9 @@ function QuickAddForm({ editing, defaultType, onDone }) {
       )}
 
       <FieldLabel>
-        {needsDestination ? t('transactions.fieldFromAccount') : t('quickAdd.account')}
+        {needsDestination
+          ? t('transactions.fieldFromAccount')
+          : t(isReceivable && flow === 'in' ? 'quickAdd.accountIn' : 'quickAdd.account')}
       </FieldLabel>
       <div className="mb-4 flex flex-wrap gap-1.5">
         {accounts.map((a) => (

@@ -1,19 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  Panel, PanelTitle, SegmentedTabs, Meter, IconBadge, InitialBadge, Icon,
+  Panel, PanelTitle, Meter, IconBadge, InitialBadge, Icon,
 } from '@/components/ui/design';
 import PageHeader from '@/components/PageHeader';
-import { MonthField } from '@/components/ui/date-fields';
+import { ReportPeriodControls } from '@/components/ui/date-fields';
+import useReportPeriod from '@/hooks/useReportPeriod';
 import useStore from '@/store/useStore';
-import { useT, useDateFormat } from '@/hooks/useT';
-import { useMonthFilter } from '@/hooks/useCycle';
-import { getAllCategories } from '@/lib/constants';
+import { useT } from '@/hooks/useT';
+import { getAllCategories, isNeutralType, isSavingsAccount } from '@/lib/constants';
 import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
 import {
-  filterTransactionsByYear, calculateTotals,
-  formatCurrency, groupBySubcategory, cn,
-  getMonthKey,
+  calculateTotals, formatCurrency, groupBySubcategory, cn,
 } from '@/lib/utils';
 import { exportToExcel } from '@/lib/excel';
 
@@ -46,45 +44,42 @@ function gradeFor(savingsRate, expenseRate) {
 
 export default function Reports() {
   const t = useT();
-  const dates = useDateFormat();
 
-  const transactions = useStore((s) => s.transactions);
   const accounts = useStore((s) => s.accounts);
   const customCategories = useStore((s) => s.customCategories);
 
-  const [period, setPeriod] = useState('monthly');
-  const [month, setMonth] = useState(() => getMonthKey(new Date()));
-  const filterByMonth = useMonthFilter();
+  const period = useReportPeriod();
+  const { activeTx } = period;
 
   const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
-  const year = Number(month.slice(0, 4));
 
-  const activeTx = useMemo(
-    () => (period === 'yearly'
-      ? filterTransactionsByYear(transactions, year)
-      : filterByMonth(transactions, month)),
-    [filterByMonth, transactions, period, year, month]
+  const totals = useMemo(
+    () => calculateTotals(activeTx, allCategories, accounts),
+    [activeTx, allCategories, accounts]
   );
 
-  const totals = useMemo(() => calculateTotals(activeTx, allCategories), [activeTx, allCategories]);
+  const savingsAccountNames = accounts.filter(isSavingsAccount).map((a) => a.name).join(', ');
 
   const groups = useMemo(() => Object.entries(allCategories)
-    .filter(([, c]) => c.type !== 'transfer')
+    .filter(([, c]) => !isNeutralType(c.type))
     .map(([key, c]) => {
       const catTx = activeTx.filter((x) => x.category === key);
       const subs = Object.entries(groupBySubcategory(catTx))
         .sort((a, b) => b[1].total - a[1].total)
         .map(([name, data]) => ({ name: subcategoryLabel(name, t), value: data.total }));
+      // Savings also shows what the savings accounts grew by, named after them.
+      const grown = key === 'savings' ? totals.savedInAccounts : 0;
+      if (grown !== 0) subs.unshift({ name: savingsAccountNames || t('accounts.savingsAccounts'), value: grown });
       return {
         key,
         label: categoryLabel(c, t),
         color: GROUP_TONE[key] || c.hex,
         subs,
-        total: catTx.reduce((s, x) => s + x.amount, 0),
+        total: catTx.reduce((s, x) => s + x.amount, 0) + grown,
       };
     })
     .filter((g) => g.subs.length > 0),
-  [activeTx, allCategories, t]);
+  [activeTx, allCategories, totals.savedInAccounts, savingsAccountNames, t]);
 
   const savingsRate = totals.income > 0 ? Math.round((totals.savings / totals.income) * 100) : 0;
   const investmentRate = totals.income > 0 ? Math.round((totals.investments / totals.income) * 100) : 0;
@@ -114,31 +109,21 @@ export default function Reports() {
       expense: rows
         .filter((x) => {
           const type = allCategories[x.category]?.type;
-          return type !== 'income' && type !== 'transfer';
+          return type !== 'income' && !isNeutralType(type);
         })
         .reduce((s, x) => s + x.amount, 0),
     };
   }).filter((a) => a.txCount > 0), [accounts, activeTx, allCategories]);
-
-  const periodLabel = period === 'yearly' ? String(year) : dates.month(`${month}-01`);
 
   return (
     <>
       <PageHeader
         actions={
           <>
-            <SegmentedTabs
-              value={period}
-              onChange={setPeriod}
-              options={[
-                { value: 'monthly', label: t('reports.monthly') },
-                { value: 'yearly', label: t('reports.yearly') },
-              ]}
-            />
-            <MonthField value={month} onChange={setMonth} />
+            <ReportPeriodControls period={period} />
             <Button
               variant="outline"
-              onClick={() => exportToExcel(activeTx, accounts, `penny-${period}-${month}`)}
+              onClick={() => exportToExcel(activeTx, accounts, `penny-${period.fileKey}`)}
               className="rounded-xl px-4 py-2.5 font-semibold"
             >
               <Icon name="download" size={17} /> {t('reports.export')}
@@ -151,7 +136,7 @@ export default function Reports() {
         <div className="overflow-hidden rounded-[20px] border border-border bg-card shadow-(--shadow-card)">
           <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
             <h3 className="text-sm font-bold">{t('reports.summaryTitle')}</h3>
-            <span className="text-xs text-muted-foreground">{periodLabel}</span>
+            <span className="text-xs text-muted-foreground">{period.label}</span>
           </div>
 
           {groups.length > 0 ? (
@@ -216,7 +201,8 @@ export default function Reports() {
                 {t(`health.grade${grade.key}`)}
               </div>
               <div className="text-[13px] text-muted-foreground">
-                {t(`health.grade${grade.key}Body`)}
+                {/* Past 100% it's no longer "nearly all": say so. */}
+                {t(expenseRate > 100 ? 'health.gradeOverBody' : `health.grade${grade.key}Body`)}
               </div>
             </div>
           </div>

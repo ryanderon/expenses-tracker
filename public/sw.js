@@ -39,6 +39,25 @@ self.addEventListener('fetch', (event) => {
   // Live data (stock quotes) must never be served from the cache.
   if (url.pathname.startsWith('/api/')) return;
 
+  // Manrope and the Material Symbols icons come from Google Fonts. Keep a copy,
+  // or opening the app offline after the browser's own cache has expired shows
+  // every icon as its name ("calendar_month") and pushes the layout apart.
+  // Serve the copy straight away and refresh it in the background.
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    const cached = caches.match(request);
+    const fresh = fetch(request).then(async (response) => {
+      // The stylesheet link is a no-cors request, so its response is opaque.
+      if (response.ok || response.type === 'opaque') {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(request, response.clone());
+      }
+      return response;
+    });
+    event.respondWith(cached.then((hit) => hit || fresh));
+    event.waitUntil(fresh.catch(() => {}));
+    return;
+  }
+
   // For navigation requests, try network first then fall back to cached index.html
   if (request.mode === 'navigate') {
     event.respondWith(

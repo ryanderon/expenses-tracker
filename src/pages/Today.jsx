@@ -20,6 +20,11 @@ import PageHeader from '@/components/PageHeader';
  * `pct` is how much of today's allowance is already spent, so the ring fills
  * as the day goes on rather than draining.
  */
+/** Millions don't fit the ring at the big size on a phone. */
+function ringTextSize(amount) {
+  return Math.abs(amount) >= 1_000_000 ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl';
+}
+
 function AllowanceRing({ pct, tone, children }) {
   const radius = 86;
   const circumference = 2 * Math.PI * radius;
@@ -88,7 +93,8 @@ function Alerts({ report, t }) {
 
 function EntryRow({ tx, allCategories, accounts, t, dates }) {
   const cat = allCategories[tx.category];
-  const isIncome = cat?.type === 'income';
+  // Money in: income, or a receivable being paid back.
+  const isIncome = cat?.type === 'income' || (cat?.type === 'receivable' && tx.flow === 'in');
   const account = accounts.find((a) => a.id === tx.account);
 
   return (
@@ -138,15 +144,15 @@ export default function Today() {
   const report = useMemo(
     () => buildBudgetReport({
       monthKey, transactions, allCategories, customSubcategories, customCategories,
-      budgets, subBudgets, budgetTemplate, budgetSettings,
+      budgets, subBudgets, budgetTemplate, budgetSettings, accounts,
     }),
     [monthKey, transactions, allCategories, customSubcategories, customCategories,
-      budgets, subBudgets, budgetTemplate, budgetSettings]
+      budgets, subBudgets, budgetTemplate, budgetSettings, accounts]
   );
 
   const daily = useMemo(
-    () => getDailyAllowance(monthKey, report.totalBudget, transactions, allCategories),
-    [monthKey, report.totalBudget, transactions, allCategories]
+    () => getDailyAllowance(monthKey, report.spendBudget, transactions, allCategories),
+    [monthKey, report.spendBudget, transactions, allCategories]
   );
 
   const todayEntries = useMemo(
@@ -167,9 +173,13 @@ export default function Today() {
   const hasData = transactions.length > 0;
   const hasBudget = report.totalBudget > 0;
 
-  const tone = daily.isOver
-    ? 'var(--destructive)'
-    : daily.pctUsed >= 80 ? 'var(--chart-2)' : 'var(--chart-1)';
+  const { spending } = report;
+  // The whole period's limit is gone: there's no "allowance for today" to
+  // show, only how far over it is.
+  const periodOver = spending.isOver;
+  let tone = 'var(--chart-1)';
+  if (daily.isOver || periodOver) tone = 'var(--destructive)';
+  else if (daily.pctUsed >= 80) tone = 'var(--chart-2)';
 
   return (
     <>
@@ -179,21 +189,34 @@ export default function Today() {
       {/* Hero */}
       {hasBudget && daily.applicable ? (
         <div data-tour="today-hero" className="flex flex-col items-center gap-6">
-          <AllowanceRing pct={daily.pctUsed} tone={tone}>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-              {daily.left >= 0 ? t('today.leftToday') : t('today.overToday')}
-            </p>
-            <p
-              className="text-3xl sm:text-4xl font-bold tabular-nums leading-tight"
-              style={{ color: daily.left >= 0 ? undefined : 'var(--destructive)' }}
-            >
-              {formatCurrency(Math.abs(daily.left))}
-            </p>
-          </AllowanceRing>
+          {periodOver ? (
+            <AllowanceRing pct={100} tone={tone}>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
+                {t('today.periodOver')}
+              </p>
+              <p className={cn('font-bold tabular-nums leading-tight text-destructive', ringTextSize(-spending.remaining))}>
+                {formatCurrency(-spending.remaining)}
+              </p>
+            </AllowanceRing>
+          ) : (
+            <AllowanceRing pct={daily.pctUsed} tone={tone}>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
+                {daily.left >= 0 ? t('today.leftToday') : t('today.overToday')}
+              </p>
+              <p
+                className={cn('font-bold tabular-nums leading-tight', ringTextSize(daily.left))}
+                style={{ color: daily.left >= 0 ? undefined : 'var(--destructive)' }}
+              >
+                {formatCurrency(Math.abs(daily.left))}
+              </p>
+            </AllowanceRing>
+          )}
 
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
-              {t('today.allowanceLine', { amount: formatCurrency(daily.allowance) })}
+              {periodOver
+                ? t('today.periodOverBody', { limit: formatCurrency(spending.budget) })
+                : t('today.allowanceLine', { amount: formatCurrency(daily.allowance) })}
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
               {daily.daysLeft <= 1
@@ -203,7 +226,7 @@ export default function Today() {
           </div>
         </div>
       ) : (
-        <Card className="border-dashed">
+        <Card data-tour="today-hero" className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
             <div className="size-11 rounded-2xl bg-primary/10 flex items-center justify-center">
               <Target className="text-primary size-5" />
@@ -259,30 +282,31 @@ export default function Today() {
               <div>
                 <p className="text-xs text-muted-foreground">{t('today.monthSpent')}</p>
                 <p className="text-lg font-semibold tabular-nums">
-                  {formatCurrency(report.totalSpent)}
+                  {formatCurrency(spending.spent)}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">{t('today.monthRemaining')}</p>
                 <p className={cn(
                   'text-lg font-semibold tabular-nums',
-                  report.totalRemaining < 0 && 'text-destructive'
+                  spending.remaining < 0 && 'text-destructive'
                 )}>
-                  {formatCurrency(report.totalRemaining)}
+                  {formatCurrency(spending.remaining)}
                 </p>
               </div>
             </div>
 
             <div className="relative">
+              {/* Spending against its limits, as on the Budget page. */}
               <Progress
-                value={report.totalPct}
+                value={spending.pct}
                 className="h-1.5"
-                style={{ '--progress-color': report.totalPctRaw > 100 ? 'var(--destructive)' : undefined }}
+                style={{ '--progress-color': spending.isOver ? 'var(--destructive)' : undefined }}
               />
-              {report.pacing.isCurrent && report.pacing.elapsedPct < 100 && (
+              {spending.pacing.isCurrent && spending.pacing.elapsedPct < 100 && (
                 <div
                   className="absolute -top-0.5 h-2.5 w-0.5 rounded-full bg-foreground/40"
-                  style={{ left: `${report.pacing.elapsedPct}%` }}
+                  style={{ left: `${spending.pacing.elapsedPct}%` }}
                 />
               )}
             </div>

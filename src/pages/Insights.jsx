@@ -1,435 +1,726 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Sparkles, Send, Square, KeyRound, RefreshCw, ChartNoAxesCombined, Target,
-  PiggyBank, TrendingUp, HeartPulse, AlertTriangle, Settings as SettingsIcon,
-  Copy, Check,
-} from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { MonthField } from '@/components/ui/date-fields';
-import { SegmentedTabs } from '@/components/ui/design';
+import { SegmentedTabs, Icon, IconBadge, EmptyState } from '@/components/ui/design';
 import Markdown from '@/components/Markdown';
 import useStore from '@/store/useStore';
-import { streamAnalysis, describeAiError } from '@/lib/ai';
+import useChatStore, { isActive } from '@/store/useChatStore';
 import { getModelInfo, getProviderInfo, keyForModel, AI_MODELS } from '@/lib/aiModels';
-import { buildFinancialSnapshot, buildContextMessage, QUICK_PROMPTS } from '@/lib/aiContext';
-import { generateId, getMonthKey } from '@/lib/utils';
+import { QUICK_PROMPTS } from '@/lib/aiContext';
+import { cn, getMonthKey, getMonthRange } from '@/lib/utils';
 import { useT, useDateFormat } from '@/hooks/useT';
+import { usePeriodLabel, useCycle } from '@/hooks/useCycle';
 import PageHeader from '@/components/PageHeader';
 import InsightsSummary from '@/components/InsightsSummary';
 
 const PROMPT_ICONS = {
-  chart: ChartNoAxesCombined,
-  target: Target,
-  piggy: PiggyBank,
-  trend: TrendingUp,
-  heart: HeartPulse,
+  overview: { icon: 'query_stats', tone: 'primary' },
+  budget: { icon: 'track_changes', tone: 'amber' },
+  savings: { icon: 'savings', tone: 'teal' },
+  trend: { icon: 'trending_up', tone: 'violet' },
+  health: { icon: 'monitor_heart', tone: 'danger' },
 };
+
+/** Errors the user fixes in Settings get a link straight there. */
+const SETTINGS_ERRORS = new Set([
+  'insights.errNoKey', 'insights.errAuth', 'insights.errPermission', 'insights.errNotFound',
+]);
+
+const CHIP = 'flex h-8 min-w-0 items-center gap-1.5 rounded-full bg-secondary px-3 text-[12.5px] '
+  + 'font-semibold text-muted-foreground transition-colors hover:text-foreground '
+  + 'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50';
+
+/** "25 Okt–24 Nov" for a custom cycle, "Nov 2026" for a calendar month. */
+function shortPeriodLabel(monthKey, calendar, locale) {
+  const { start, end } = getMonthRange(monthKey);
+  if (calendar) return format(start, 'MMM yyyy', { locale });
+  return `${format(start, 'd MMM', { locale })}–${format(end, 'd MMM', { locale })}`;
+}
+
+function formatTokens(usage) {
+  if (!usage) return null;
+  // Claude reports cached input separately; the user paid for all of it.
+  const input = (usage.input_tokens || 0)
+    + (usage.cache_read_input_tokens || 0)
+    + (usage.cache_creation_input_tokens || 0);
+  return { input: input.toLocaleString(), output: (usage.output_tokens || 0).toLocaleString() };
+}
+
+// --- Setup states ----------------------------------------------------------
 
 function SetupPrompt() {
   const t = useT();
   return (
-    <Card className="mx-auto w-full max-w-xl border-dashed">
-      <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-        <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-          <KeyRound className="text-primary size-5" />
-        </div>
+    <div className="mx-auto w-full max-w-xl pt-2">
+      <EmptyState
+        icon="key"
+        title={t('insights.setupTitle')}
+        body={t('insights.setupBody')}
+        action={(
+          <div className="flex flex-col items-center gap-2">
+            <Button asChild size="sm">
+              <Link to="/settings">{t('insights.setupAction')}</Link>
+            </Button>
+            <a
+              href={getProviderInfo('google').keyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              {t('insights.setupLink')}
+            </a>
+          </div>
+        )}
+      />
+    </div>
+  );
+}
+
+// --- Composer controls -----------------------------------------------------
+
+function ScopePicker({ scope, years, onChange }) {
+  const t = useT();
+  const dates = useDateFormat();
+  const { calendar } = useCycle();
+  const monthKey = scope.monthKey || getMonthKey(new Date());
+
+  const [open, setOpen] = useState(false);
+  const [type, setType] = useState(scope.type);
+  const [year, setYear] = useState(() => Number(monthKey.slice(0, 4)));
+
+  const label = scope.type === 'year'
+    ? scope.year
+    : shortPeriodLabel(monthKey, calendar, dates.dateLocale);
+
+  const pick = (next) => {
+    setOpen(false);
+    onChange(next);
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) {
+          setType(scope.type);
+          setYear(Number(monthKey.slice(0, 4)));
+        }
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button type="button" className={CHIP} title={t('insights.choosePeriod')}>
+          <Icon name="calendar_month" size={16} />
+          <span className="truncate">{label}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="top" className="w-64 gap-3 rounded-[14px] p-3">
         <div>
-          <h3 className="text-sm font-semibold">{t('insights.setupTitle')}</h3>
-          <p className="text-sm text-muted-foreground mt-1 max-w-md">
-            {t('insights.setupBody')}
-          </p>
+          <p className="text-[13px] font-bold">{t('insights.choosePeriod')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('insights.choosePeriodHint')}</p>
         </div>
-        <Button asChild size="sm">
-          <Link to="/settings">
-            <SettingsIcon data-icon="inline-start" /> {t('insights.setupAction')}
-          </Link>
-        </Button>
-        <a
-          href={getProviderInfo('google').keyUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-        >
-          {t('insights.setupLink')}
-        </a>
-      </CardContent>
-    </Card>
+        <SegmentedTabs
+          value={type}
+          onChange={setType}
+          className="w-full [&>button]:flex-1"
+          options={[
+            { value: 'month', label: t('common.month') },
+            { value: 'year', label: t('common.year') },
+          ]}
+        />
+        {type === 'month' ? (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setYear((y) => y - 1)}
+                className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <Icon name="chevron_left" size={18} />
+              </button>
+              <span className="text-[13px] font-bold tabular-nums">{year}</span>
+              <button
+                type="button"
+                onClick={() => setYear((y) => y + 1)}
+                className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <Icon name="chevron_right" size={18} />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {Array.from({ length: 12 }, (_, i) => {
+                const key = `${year}-${String(i + 1).padStart(2, '0')}`;
+                const active = scope.type === 'month' && key === monthKey;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => pick({ type: 'month', monthKey: key })}
+                    className={cn(
+                      'rounded-lg px-1 py-2 text-center text-[12.5px] transition-colors',
+                      active
+                        ? 'bg-primary font-extrabold text-primary-foreground'
+                        : 'font-medium hover:bg-secondary'
+                    )}
+                  >
+                    {dates.monthShort(`${key}-01`).split(' ')[0]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-1">
+            {years.map((y) => (
+              <button
+                key={y}
+                type="button"
+                onClick={() => pick({ type: 'year', year: y })}
+                className={cn(
+                  'rounded-lg px-1 py-2 text-center text-[12.5px] tabular-nums transition-colors',
+                  scope.type === 'year' && scope.year === y
+                    ? 'bg-primary font-extrabold text-primary-foreground'
+                    : 'font-medium hover:bg-secondary'
+                )}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ModelPicker({ value, models, onChange }) {
+  const t = useT();
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger
+        title={t('insights.modelLabel')}
+        className={cn(
+          CHIP,
+          'w-auto border-0 py-0 pr-2 dark:bg-secondary dark:hover:bg-secondary [&_svg]:size-3.5'
+        )}
+      >
+        <Icon name="auto_awesome" size={15} />
+        <SelectValue>{getModelInfo(value).shortLabel}</SelectValue>
+      </SelectTrigger>
+      <SelectContent position="popper" side="top" align="start">
+        <SelectGroup>
+          {models.map((m) => (
+            <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
+
+function Composer({ busy, placeholder, onSend, onStop, controls }) {
+  const t = useT();
+  const [value, setValue] = useState('');
+  const ref = useRef(null);
+  // On a phone Return should break a line, as in every messaging app; the
+  // send button is right there. With a keyboard, Enter sends.
+  const touch = useMemo(() => window.matchMedia?.('(pointer: coarse)').matches ?? false, []);
+
+  // Grows with the text up to ~6 lines, then scrolls inside itself.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 168)}px`;
+  }, [value]);
+
+  const submit = () => {
+    if (busy || !value.trim()) return;
+    onSend(value);
+    setValue('');
+  };
+
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); submit(); }}
+      className="rounded-[22px] border border-border bg-card p-2 shadow-(--shadow-card) transition-colors focus-within:border-ring/60"
+    >
+      <textarea
+        ref={ref}
+        rows={1}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey && !touch && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        placeholder={placeholder}
+        enterKeyHint={touch ? 'enter' : 'send'}
+        aria-label={placeholder}
+        className="block w-full resize-none bg-transparent px-2.5 pt-1.5 pb-1 text-base leading-6 outline-none placeholder:text-muted-foreground md:text-[14.5px]"
+      />
+      <div className="flex items-center gap-1.5 pt-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">{controls}</div>
+        {busy ? (
+          <button
+            type="button"
+            onClick={onStop}
+            aria-label={t('insights.stop')}
+            title={t('insights.stop')}
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-85"
+          >
+            <Icon name="stop" size={20} />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!value.trim()}
+            aria-label={t('insights.send')}
+            title={t('insights.send')}
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-35"
+          >
+            <Icon name="arrow_upward" size={20} />
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+// --- Thread ----------------------------------------------------------------
+
+function TypingIndicator({ label }) {
+  return (
+    <div className="flex items-center gap-2.5 py-1 text-[13px] text-muted-foreground">
+      <span className="flex gap-1" aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="size-1.5 animate-bounce rounded-full bg-primary/70 motion-reduce:animate-none"
+            style={{ animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </span>
+      {label}
+    </div>
+  );
+}
+
+function ActionButton({ icon, label, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+    >
+      <Icon name={icon} size={16} />
+      {label}
+    </button>
   );
 }
 
 function CopyButton({ text }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return undefined;
+    const id = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(id);
+  }, [copied]);
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="h-7 text-xs text-muted-foreground"
+    <ActionButton
+      icon={copied ? 'check' : 'content_copy'}
+      label={copied ? t('insights.copied') : t('insights.copy')}
       onClick={() => {
         navigator.clipboard?.writeText(text);
         setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
       }}
-    >
-      {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-      {copied ? t('insights.copied') : t('insights.copy')}
-    </Button>
+    />
   );
 }
 
-export default function Insights() {
+function Answer({ exchange, isLast, onRetry }) {
   const t = useT();
-  const dates = useDateFormat();
+  const { status, answer, error, model, usage, truncated } = exchange;
+  const working = isActive(exchange);
+  const tokens = formatTokens(usage);
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
+        <span
+          className={cn(
+            'flex size-6 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-primary',
+            working && 'animate-pulse motion-reduce:animate-none'
+          )}
+        >
+          <Icon name="auto_awesome" size={14} />
+        </span>
+        {getModelInfo(model).label}
+      </div>
+
+      {answer && <Markdown content={answer} />}
+
+      {working && !answer && (
+        <TypingIndicator
+          label={`${t(status === 'thinking' ? 'insights.thinking' : 'insights.reading')}…`}
+        />
+      )}
+
+      {status === 'error' && (
+        <div className="flex items-start gap-2.5 rounded-2xl bg-danger-soft px-3.5 py-3 text-[13.5px] text-danger">
+          <Icon name="error" size={18} className="mt-px shrink-0" />
+          <div className="flex flex-col items-start gap-2">
+            <p>{t(error)}</p>
+            <div className="flex flex-wrap gap-3 text-[12.5px] font-bold">
+              {isLast && (
+                <button type="button" onClick={onRetry} className="underline underline-offset-2">
+                  {t('insights.retry')}
+                </button>
+              )}
+              {SETTINGS_ERRORS.has(error) && (
+                <Link to="/settings" className="underline underline-offset-2">
+                  {t('insights.openSettings')}
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(status === 'stopped' || truncated) && (
+        <p className="text-[12.5px] italic text-muted-foreground">
+          {t(truncated ? 'insights.truncated' : 'insights.stopped')}
+        </p>
+      )}
+
+      {!working && status !== 'error' && (
+        <div className="-ml-2 flex flex-wrap items-center gap-0.5">
+          {answer && <CopyButton text={answer} />}
+          {isLast && (
+            <ActionButton
+              icon="refresh"
+              label={t(status === 'stopped' && !answer ? 'insights.retry' : 'insights.regenerate')}
+              onClick={onRetry}
+            />
+          )}
+          {tokens && (
+            <span className="ml-auto px-2 text-[11px] tabular-nums text-muted-foreground/80">
+              {t('insights.tokensUsed', tokens)}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Exchange({ exchange, isLast, minHeight, onRetry }) {
+  return (
+    <div data-exchange={exchange.id} className="flex flex-col gap-5" style={{ minHeight }}>
+      <div className="ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] rounded-br-md bg-secondary px-4 py-2.5 text-[14.5px] leading-relaxed">
+        {exchange.question}
+      </div>
+      <Answer exchange={exchange} isLast={isLast} onRetry={onRetry} />
+    </div>
+  );
+}
+
+function EmptyChat({ period, minHeight, onPick }) {
+  const t = useT();
+  return (
+    <div className="flex flex-col justify-center gap-5" style={{ minHeight }}>
+      <div className="flex flex-col items-center gap-2.5 text-center">
+        <IconBadge name="auto_awesome" size={42} />
+        <div>
+          <h2 className="text-[16px] font-extrabold">{t('insights.emptyTitle')}</h2>
+          <p className="mx-auto mt-1 max-w-sm text-[13px] text-muted-foreground">
+            {t('insights.emptyBody', { period })}
+          </p>
+        </div>
+      </div>
+      <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
+        {QUICK_PROMPTS.map((p) => {
+          const look = PROMPT_ICONS[p.id] || PROMPT_ICONS.overview;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onPick(t(p.promptKey))}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-card px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/40"
+            >
+              <IconBadge name={look.icon} tone={look.tone} size={32} />
+              <span className="min-w-0 flex-1 text-[13.5px] font-semibold">{t(p.labelKey)}</span>
+              <Icon name="arrow_forward" size={16} className="text-muted-foreground" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The chat itself. Scrolling follows the pattern of the big chat apps: when a
+ * question is sent it slides to the top of the view and the answer writes
+ * itself out underneath, so the reader starts at the top of the answer
+ * instead of being dragged along by every new line. To make room for that,
+ * the latest exchange is always at least one viewport tall.
+ */
+function AiChat({ years }) {
+  const t = useT();
+  const periodLabel = usePeriodLabel();
   const aiSettings = useStore((s) => s.aiSettings);
   const setAiSettings = useStore((s) => s.setAiSettings);
-  const transactions = useStore((s) => s.transactions);
+  const scope = useChatStore((s) => s.scope);
+  const exchanges = useChatStore((s) => s.exchanges);
+  const ask = useChatStore((s) => s.ask);
+  const retry = useChatStore((s) => s.retry);
+  const stop = useChatStore((s) => s.stop);
+  const setScope = useChatStore((s) => s.setScope);
 
-  const [mode, setMode] = useState('summary');
-  const [scopeType, setScopeType] = useState('month');
-  const [scopeMonth, setScopeMonth] = useState(getMonthKey(new Date()));
-  const [scopeYear, setScopeYear] = useState(String(new Date().getFullYear()));
-
-  const [turns, setTurns] = useState([]);
-  const [streamingText, setStreamingText] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState(null);
-  const [input, setInput] = useState('');
-  const [usage, setUsage] = useState(null);
-
-  const abortRef = useRef(null);
-  const bottomRef = useRef(null);
-
-  const apiKey = keyForModel(aiSettings, aiSettings.model);
-  const hasKey = !!apiKey;
-  // Only offer models the user holds a key for; the rest live in Settings.
+  const busy = exchanges.some(isActive);
   const usableModels = AI_MODELS.filter((m) => keyForModel(aiSettings, m.id));
+  const monthKey = scope.monthKey || getMonthKey(new Date());
+  const period = scope.type === 'year' ? scope.year : periodLabel(monthKey);
+
+  const scrollRef = useRef(null);
+  const contentRef = useRef(null);
+  const pinRef = useRef(null);
+  const [viewportH, setViewportH] = useState(0);
+  const [atBottom, setAtBottom] = useState(true);
+
+  const measure = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return undefined;
+    setViewportH(el.clientHeight);
+    const ro = new ResizeObserver(() => {
+      setViewportH(el.clientHeight);
+      measure();
+    });
+    ro.observe(el);
+    if (contentRef.current) ro.observe(contentRef.current);
+    return () => ro.disconnect();
+  }, [measure]);
+
+  // Coming back to an existing thread opens on its latest exchange.
+  useLayoutEffect(() => {
+    const last = useChatStore.getState().exchanges.at(-1);
+    if (last) pinRef.current = { id: last.id, smooth: false };
+  }, []);
+
+  useLayoutEffect(() => {
+    const pin = pinRef.current;
+    const scroller = scrollRef.current;
+    if (!pin || !scroller || !viewportH) return;
+    // Sending also shrinks the composer back to one line, which makes the
+    // thread taller than the height the filler was sized from. Re-measure
+    // first, or the scroll stops short by however many lines were typed.
+    if (scroller.clientHeight !== viewportH) {
+      setViewportH(scroller.clientHeight);
+      return;
+    }
+    const node = scroller.querySelector(`[data-exchange="${pin.id}"]`);
+    if (!node) return;
+    pinRef.current = null;
+    scroller.scrollTo({ top: node.offsetTop - 16, behavior: pin.smooth ? 'smooth' : 'auto' });
+  }, [exchanges, viewportH]);
+
+  const send = (text) => {
+    const id = ask(text);
+    if (id) pinRef.current = { id, smooth: true };
+  };
+
+  const onRetry = () => {
+    const id = retry();
+    if (id) pinRef.current = { id, smooth: true };
+  };
+
+  const changeScope = (next) => {
+    const same = next.type === scope.type
+      && (next.type === 'year' ? next.year === scope.year : next.monthKey === monthKey);
+    if (same) return;
+    if (exchanges.length && !window.confirm(t('insights.scopeResetConfirm'))) return;
+    setScope(next);
+  };
+
+  // Content padding is 16px top + 24px bottom; the latest exchange fills the rest.
+  const fill = Math.max(viewportH - 40, 0);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={scrollRef}
+          onScroll={measure}
+          className="relative h-full overflow-y-auto overscroll-contain"
+        >
+          <div ref={contentRef} className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-0.5 pt-4 pb-6">
+            {exchanges.length === 0 ? (
+              <EmptyChat period={period} minHeight={fill} onPick={send} />
+            ) : (
+              exchanges.map((ex, i) => (
+                <Exchange
+                  key={ex.id}
+                  exchange={ex}
+                  isLast={i === exchanges.length - 1}
+                  minHeight={i === exchanges.length - 1 ? fill : undefined}
+                  onRetry={onRetry}
+                />
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Soft edge so text fades out under the composer instead of being cut. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-linear-to-t from-background to-transparent" />
+
+        {!atBottom && exchanges.length > 0 && (
+          <button
+            type="button"
+            onClick={() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })}
+            aria-label={t('insights.scrollDown')}
+            className="absolute bottom-3 left-1/2 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-(--shadow-card) transition-colors hover:text-primary"
+          >
+            <Icon name="arrow_downward" size={18} />
+          </button>
+        )}
+      </div>
+
+      <div className="mx-auto w-full max-w-3xl pt-2">
+        <Composer
+          busy={busy}
+          onSend={send}
+          onStop={stop}
+          placeholder={
+            exchanges.length
+              ? t('insights.followUpPlaceholder')
+              : t('insights.askPlaceholder', { period })
+          }
+          controls={(
+            <>
+              <ScopePicker scope={scope} years={years} onChange={changeScope} />
+              <ModelPicker
+                value={aiSettings.model}
+                models={usableModels}
+                onChange={(v) => setAiSettings({ model: v })}
+              />
+            </>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+// --- Page ------------------------------------------------------------------
+
+export default function Insights() {
+  const t = useT();
+  const tab = useChatStore((s) => s.tab);
+  const setTab = useChatStore((s) => s.setTab);
+  const hasThread = useChatStore((s) => s.exchanges.length > 0);
+  const reset = useChatStore((s) => s.reset);
+  const aiSettings = useStore((s) => s.aiSettings);
+  const transactions = useStore((s) => s.transactions);
+  const [summaryMonth, setSummaryMonth] = useState(() => getMonthKey(new Date()));
+
+  const hasKey = !!keyForModel(aiSettings, aiSettings.model);
   const hasData = transactions.length > 0;
 
   const years = useMemo(() => {
-    const yrs = [...new Set(transactions.map((t) => new Date(t.date).getFullYear()))];
-    const current = new Date().getFullYear();
-    if (!yrs.includes(current)) yrs.push(current);
-    return yrs.sort((a, b) => b - a).map(String);
+    const yrs = new Set(transactions.map((tx) => String(new Date(tx.date).getFullYear())));
+    yrs.add(String(new Date().getFullYear()));
+    return [...yrs].sort((a, b) => b - a);
   }, [transactions]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [streamingText, turns.length]);
+  const tabs = (
+    <SegmentedTabs
+      value={tab}
+      onChange={setTab}
+      options={[
+        { value: 'summary', label: t('insights.tabSummary') },
+        {
+          value: 'ai',
+          label: (
+            <span className="flex items-center gap-1.5">
+              {t('insights.tabAi')}
+              <Badge variant="secondary" className="px-1.5 text-[9px]">{t('insights.beta')}</Badge>
+            </span>
+          ),
+        },
+      ]}
+    />
+  );
 
-  // Cancel any in-flight request if the user navigates away mid-stream.
-  useEffect(() => () => abortRef.current?.abort(), []);
-
-  const scopeLabel = scopeType === 'year' ? scopeYear : dates.monthShort(`${scopeMonth}-01`);
-
-  const resetThread = useCallback(() => {
-    abortRef.current?.abort();
-    setTurns([]);
-    setStreamingText('');
-    setError(null);
-    setUsage(null);
-  }, []);
-
-  const ask = useCallback(async (question) => {
-    if (!question.trim() || isStreaming) return;
-
-    setError(null);
-    setInput('');
-
-    // The snapshot only rides along with the first question — later turns
-    // already have it in context, and resending would double the token bill.
-    const isFirst = turns.length === 0;
-    const apiContent = isFirst
-      ? buildContextMessage(
-          buildFinancialSnapshot(useStore.getState(), {
-            scope: scopeType,
-            monthKey: scopeMonth,
-            year: scopeYear,
-          }),
-          question
-        )
-      : question;
-
-    const nextTurns = [...turns, { id: generateId(), role: 'user', text: question, apiContent }];
-    setTurns(nextTurns);
-    setIsStreaming(true);
-    setStreamingText('');
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    try {
-      const { text, usage: tokens } = await streamAnalysis({
-        apiKey,
-        model: aiSettings.model,
-        effort: aiSettings.effort || 'high',
-        messages: nextTurns.map((t) => ({
-          role: t.role,
-          content: t.role === 'user' ? t.apiContent : t.text,
-        })),
-        onText: (delta) => setStreamingText((prev) => prev + delta),
-        signal: controller.signal,
-      });
-
-      setTurns((prev) => [...prev, { id: generateId(), role: 'assistant', text }]);
-      setUsage(tokens);
-    } catch (err) {
-      if (err?.name !== 'AbortError') setError(t(describeAiError(err)));
-      // Drop the unanswered question so a retry doesn't stack duplicates.
-      setTurns((prev) => prev.slice(0, -1));
-    } finally {
-      setIsStreaming(false);
-      setStreamingText('');
-      abortRef.current = null;
-    }
-  }, [aiSettings, apiKey, isStreaming, turns, scopeType, scopeMonth, scopeYear, t]);
-
-  const modelInfo = getModelInfo(aiSettings.model);
+  if (tab === 'summary') {
+    return (
+      <>
+        <div data-tour="insights-header">
+          <PageHeader actions={<MonthField value={summaryMonth} onChange={setSummaryMonth} />} />
+        </div>
+        <div className="flex flex-col gap-4">
+          {tabs}
+          <InsightsSummary monthKey={summaryMonth} />
+        </div>
+      </>
+    );
+  }
 
   return (
-    <>
-      <div data-tour="insights-header">
-      <PageHeader
-        actions={mode === 'summary' ? (
-          <MonthField value={scopeMonth} onChange={(v) => { setScopeMonth(v); resetThread(); }} />
-        ) : hasKey && (
-          <div className="flex items-center gap-2">
-            <SegmentedTabs
-              value={scopeType}
-              onChange={(v) => { setScopeType(v); resetThread(); }}
-              options={[
-                { value: 'month', label: t('common.month') },
-                { value: 'year', label: t('common.year') },
-              ]}
-            />
-            {scopeType === 'month' ? (
-              <MonthField
-                value={scopeMonth}
-                onChange={(v) => { setScopeMonth(v); resetThread(); }}
-              />
-            ) : (
-              <Select value={scopeYear} onValueChange={(v) => { setScopeYear(v); resetThread(); }}>
-                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            )}
-          </div>
+    // Sized to the viewport so the thread scrolls inside itself and the
+    // composer stays put above the bottom nav. App.jsx publishes the header
+    // and nav heights, and drops <main>'s bottom padding for this page.
+    <div
+      data-chat-fill
+      data-tour="insights-header"
+      className="flex min-h-104 flex-col [--chat-gap:2.25rem] lg:[--chat-gap:3.25rem]"
+      style={{
+        height: 'calc(100dvh - var(--app-header-h, 61px) - var(--bottom-nav-h, 0px) - var(--chat-gap))',
+      }}
+    >
+      {/* The app bar already names the page on a phone; the room goes to the chat. */}
+      <div className="hidden lg:block">
+        <PageHeader />
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        {tabs}
+        {hasThread && (
+          <button
+            type="button"
+            onClick={reset}
+            className="flex h-10 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-[12.5px] font-bold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Icon name="edit_square" size={17} />
+            {/* Icon only on narrow phones, where the label would wrap the tabs. */}
+            <span className="max-[389px]:sr-only">{t('insights.newChat')}</span>
+          </button>
         )}
-      />
       </div>
 
-      <div className="flex flex-col gap-4">
-      <SegmentedTabs
-        value={mode}
-        onChange={setMode}
-        options={[
-          { value: 'summary', label: t('insights.tabSummary') },
-          {
-            value: 'ai',
-            label: (
-              <span className="flex items-center gap-1.5">
-                {t('insights.tabAi')}
-                <Badge variant="secondary" className="px-1.5 text-[9px]">{t('insights.beta')}</Badge>
-              </span>
-            ),
-          },
-        ]}
-      />
-
-      {mode === 'summary' && <InsightsSummary monthKey={scopeMonth} />}
-
-      {mode === 'ai' && !hasKey && <SetupPrompt />}
-
-      {mode === 'ai' && hasKey && !hasData && (
-        <Card className="border-dashed">
-          <CardContent className="pt-8 pb-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              {t('insights.noDataBody')}
-            </p>
-          </CardContent>
-        </Card>
+      {!hasKey && <SetupPrompt />}
+      {hasKey && !hasData && (
+        <div className="pt-4">
+          <EmptyState icon="receipt_long" title={t('insights.noDataTitle')} body={t('insights.noDataBody')} />
+        </div>
       )}
-
-      {mode === 'ai' && hasKey && hasData && (
-        <>
-          {/* Quick prompts */}
-          {turns.length === 0 && !isStreaming && (
-            <div className="flex flex-col gap-3">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                {t('insights.analysing', { period: scopeLabel })}
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {QUICK_PROMPTS.map((p) => {
-                  const Icon = PROMPT_ICONS[p.icon] || Sparkles;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => ask(t(p.promptKey))}
-                      className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50"
-                    >
-                      <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <Icon className="text-primary size-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{t(p.labelKey)}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                          {t(p.promptKey)}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Conversation */}
-          {(turns.length > 0 || isStreaming) && (
-            <div className="flex flex-col gap-4">
-              {turns.map((turn) =>
-                turn.role === 'user' ? (
-                  <div key={turn.id} className="flex justify-end">
-                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-secondary px-4 py-2.5">
-                      <p className="text-sm whitespace-pre-wrap">{turn.text}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <Card key={turn.id}>
-                    <CardContent className="pt-5">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="size-6 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Sparkles className="text-primary size-3" />
-                          </div>
-                          <span className="text-xs font-medium text-muted-foreground">
-                            {modelInfo.label}
-                          </span>
-                        </div>
-                        <CopyButton text={turn.text} />
-                      </div>
-                      <Markdown content={turn.text} />
-                    </CardContent>
-                  </Card>
-                )
-              )}
-
-              {isStreaming && (
-                <Card>
-                  <CardContent className="pt-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="size-6 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Sparkles className="text-primary size-3 animate-pulse" />
-                      </div>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {streamingText ? modelInfo.label : `${t('insights.reading')}…`}
-                      </span>
-                    </div>
-                    {streamingText
-                      ? <Markdown content={streamingText} />
-                      : (
-                        <div className="flex flex-col gap-2">
-                          <div className="h-3 w-3/4 rounded bg-muted animate-pulse" />
-                          <div className="h-3 w-full rounded bg-muted animate-pulse" />
-                          <div className="h-3 w-2/3 rounded bg-muted animate-pulse" />
-                        </div>
-                      )}
-                  </CardContent>
-                </Card>
-              )}
-
-              <div ref={bottomRef} />
-            </div>
-          )}
-
-          {error && (
-            <Card className="border-destructive/50 bg-destructive/5">
-              <CardContent className="pt-4 pb-4 flex items-start gap-2">
-                <AlertTriangle className="text-destructive size-4 mt-0.5 shrink-0" />
-                <p className="text-sm text-destructive">{error}</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Composer */}
-          <div className="flex flex-col gap-2 sticky bottom-0 bg-background pt-2 pb-1">
-            <div className="flex items-end gap-2">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    ask(input);
-                  }
-                }}
-                placeholder={
-                  turns.length
-                    ? t('insights.followUpPlaceholder')
-                    : t('insights.askPlaceholder', { period: scopeLabel })
-                }
-                rows={2}
-                disabled={isStreaming}
-                className="flex-1"
-              />
-              {isStreaming ? (
-                <Button variant="outline" onClick={() => abortRef.current?.abort()}>
-                  <Square data-icon="inline-start" /> {t('insights.stop')}
-                </Button>
-              ) : (
-                <Button onClick={() => ask(input)} disabled={!input.trim()}>
-                  <Send data-icon="inline-start" />
-                  <span className="hidden sm:inline">{t('insights.ask')}</span>
-                </Button>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Select
-                  value={aiSettings.model}
-                  onValueChange={(v) => setAiSettings({ model: v })}
-                >
-                  <SelectTrigger size="sm" className="w-44">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {usableModels.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                {turns.length > 0 && !isStreaming && (
-                  <Button variant="ghost" size="sm" onClick={resetThread}>
-                    <RefreshCw data-icon="inline-start" /> {t('insights.newAnalysis')}
-                  </Button>
-                )}
-              </div>
-
-              {usage && !isStreaming && (
-                <p className="text-[11px] text-muted-foreground tabular-nums">
-                  {t('insights.tokensUsed', {
-                    input: usage.input_tokens?.toLocaleString() ?? 0,
-                    output: usage.output_tokens?.toLocaleString() ?? 0,
-                  })}
-                </p>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-      </div>
-    </>
+      {hasKey && hasData && <AiChat years={years} />}
+    </div>
   );
 }

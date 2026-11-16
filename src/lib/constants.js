@@ -3,8 +3,33 @@ export const CATEGORY_TYPES = {
   expense: 'Expense',
   savings: 'Savings',
   investment: 'Investment',
+  receivable: 'Receivable',
   transfer: 'Transfer',
 };
+
+/**
+ * Types that move money without it being earned or spent: a transfer between
+ * your own accounts, or a receivable — money paid out on someone else's behalf
+ * (a work purchase to be reimbursed) or lent, that is coming back. Both change
+ * account balances but stay out of income, spending and budgets.
+ */
+export function isNeutralType(type) {
+  return type === 'transfer' || type === 'receivable';
+}
+
+/** Money spent or set aside: what budgets, spending totals and breakdowns count. */
+export function isOutflowType(type) {
+  return type === 'expense' || type === 'savings' || type === 'investment';
+}
+
+/**
+ * A receivable transaction is either the money going out (the default) or the
+ * money coming back (`flow: 'in'`), so a repayment, full or partial, is a row of
+ * its own on the day it lands.
+ */
+export function isReceivableReturn(tx) {
+  return tx?.flow === 'in';
+}
 
 // `labelKey` resolves through i18n; `label` is the untranslated fallback and
 // the value user-created categories carry instead. See `categoryLabel()`.
@@ -59,6 +84,16 @@ export const CATEGORIES = {
     hex: '#8347cf',
     subcategories: ['Reksa Dana', 'Stock', 'Cryptocurrency', 'Other'],
   },
+  // Paid out but coming back. Kept out of spending so a work purchase awaiting
+  // reimbursement, or a loan to a friend, doesn't inflate what you "spent".
+  receivables: {
+    labelKey: 'categoriesData.receivables',
+    label: 'Receivables',
+    type: 'receivable',
+    color: 'var(--sky)',
+    hex: '#2f6fb3',
+    subcategories: ['Reimburse', 'Lent'],
+  },
   transfer: {
     labelKey: 'categoriesData.transfer',
     label: 'Transfer',
@@ -78,6 +113,36 @@ export function getAllCategoryList(customCategories = {}) {
     id: key,
     ...val,
   }));
+}
+
+/**
+ * What an account is for:
+ * - `spending`: everyday money (salary landing, cards, e-wallets).
+ * - `savings`: money set aside. Growth in these balances is what "Savings"
+ *   means in every total, so a transfer into one is saving and a transfer out
+ *   is drawing on savings.
+ * - `investment`: not spendable tomorrow (Bibit, brokerage).
+ */
+export const ACCOUNT_ROLES = ['spending', 'savings', 'investment'];
+
+const INVESTMENT_ACCOUNT = /invest|saham|stock|reksa|crypto|kripto|bibit|pension|pensiun/i;
+const SAVINGS_ACCOUNT = /saving|tabungan/i;
+
+/** The account's role: the one the user picked, or a guess from its name and type. */
+export function accountRole(account) {
+  if (ACCOUNT_ROLES.includes(account?.role)) return account.role;
+  const text = `${account?.type || ''} ${account?.name || ''}`;
+  if (INVESTMENT_ACCOUNT.test(text)) return 'investment';
+  if (SAVINGS_ACCOUNT.test(text)) return 'savings';
+  return 'spending';
+}
+
+export function isInvestmentAccount(account) {
+  return accountRole(account) === 'investment';
+}
+
+export function isSavingsAccount(account) {
+  return accountRole(account) === 'savings';
 }
 
 export const ACCOUNT_COLORS = [

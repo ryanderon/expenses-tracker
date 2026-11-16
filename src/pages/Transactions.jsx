@@ -12,7 +12,9 @@ import QuickAdd from '@/components/QuickAdd';
 import useStore from '@/store/useStore';
 import { useT, useDateFormat } from '@/hooks/useT';
 import { useMonthFilter } from '@/hooks/useCycle';
-import { getAllCategoryList, getSubcategories } from '@/lib/constants';
+import {
+  getAllCategoryList, getSubcategories, isReceivableReturn,
+} from '@/lib/constants';
 import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
 import { formatCurrency, getMonthKey, filterTransactionsByDateRange, cn } from '@/lib/utils';
 
@@ -54,6 +56,7 @@ const TYPE_ICON = {
   expense: 'north_east',
   savings: 'savings',
   investment: 'account_balance',
+  receivable: 'handshake',
   transfer: 'swap_horiz',
 };
 
@@ -62,6 +65,7 @@ const TYPE_TONE = {
   expense: 'danger',
   savings: 'teal',
   investment: 'violet',
+  receivable: 'sky',
   transfer: 'muted',
 };
 
@@ -72,14 +76,17 @@ function TransactionRow({ tx, allCategories, accounts, t, dates, onEdit, onDelet
   const toAccount = tx.toAccount ? accounts.find((a) => a.id === tx.toAccount) : null;
   const isIncome = type === 'income';
   const isTransfer = type === 'transfer';
+  const isReceivable = type === 'receivable';
+  const returned = isReceivable && isReceivableReturn(tx);
 
   let amountClass = 'text-danger';
   if (isTransfer) amountClass = 'text-muted-foreground';
+  else if (isReceivable) amountClass = 'text-sky';
   else if (isIncome) amountClass = 'text-primary';
 
   let sign = '−';
   if (isTransfer) sign = '';
-  else if (isIncome) sign = '+';
+  else if (isIncome || returned) sign = '+';
 
   return (
     <div className="group flex items-center gap-3 rounded-[14px] p-3 transition-colors hover:bg-secondary/60">
@@ -91,6 +98,11 @@ function TransactionRow({ tx, allCategories, accounts, t, dates, onEdit, onDelet
             {subcategoryLabel(tx.subcategory, t) || categoryLabel(cat, t)}
           </span>
           <SoftBadge>{categoryLabel(cat, t)}</SoftBadge>
+          {isReceivable && (
+            <SoftBadge tone="sky">
+              {t(returned ? 'quickAdd.flowIn' : 'quickAdd.flowOut')}
+            </SoftBadge>
+          )}
         </div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground">
           {dates.short(tx.date)}
@@ -188,11 +200,10 @@ export default function Transactions() {
   const income = filtered
     .filter((x) => allCategories[x.category]?.type === 'income')
     .reduce((s, x) => s + x.amount, 0);
+  // Expense-type only, the same "Pengeluaran" as the Dashboard and Budget.
+  // Savings and investment moves are listed but aren't spending.
   const expense = filtered
-    .filter((x) => {
-      const type = allCategories[x.category]?.type;
-      return type !== 'income' && type !== 'transfer';
-    })
+    .filter((x) => allCategories[x.category]?.type === 'expense')
     .reduce((s, x) => s + x.amount, 0);
 
   const isFiltered = search || catFilter !== 'all' || accFilter !== 'all';

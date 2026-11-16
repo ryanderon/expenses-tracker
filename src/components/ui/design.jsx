@@ -52,6 +52,7 @@ const TONES = {
   teal: 'bg-teal-soft text-teal',
   violet: 'bg-violet-soft text-violet',
   amber: 'bg-amber-soft text-amber',
+  sky: 'bg-sky-soft text-sky',
   danger: 'bg-danger-soft text-danger',
   muted: 'bg-secondary text-muted-foreground',
 };

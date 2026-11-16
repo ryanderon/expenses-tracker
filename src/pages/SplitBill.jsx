@@ -175,7 +175,7 @@ export default function SplitBill() {
   const [mode, setMode] = useState('manual');
   const [items, setItems] = useState([]);
   const [people, setPeople] = useState(() => {
-    const me = { id: `p${nextPersonId++}`, name: userName || 'Me', color: PERSON_COLORS[0] };
+    const me = { id: `p${nextPersonId++}`, name: userName || t('splitBill.me'), color: PERSON_COLORS[0] };
     return [me];
   });
   const [extras, setExtras] = useState({ tax: '', serviceCharge: '', discount: '' });
@@ -250,18 +250,18 @@ export default function SplitBill() {
 
       const parsed = parseReceiptText(data.text);
       if (parsed.length === 0) {
-        setOcrError('Could not find any items. Try a clearer photo or add items manually.');
+        setOcrError(t('splitBill.ocrNoItems'));
       } else {
         setItems((prev) => [...prev, ...parsed]);
         setMode('manual');
       }
     } catch {
-      setOcrError('Failed to process image. Please try again or add items manually.');
+      setOcrError(t('splitBill.ocrFailed'));
     } finally {
       setOcrLoading(false);
       e.target.value = '';
     }
-  }, []);
+  }, [t]);
 
   const subtotal = useMemo(() =>
     items.reduce((sum, item) => sum + item.price * item.qty, 0),
@@ -314,18 +314,18 @@ export default function SplitBill() {
   const unassignedItems = items.filter((item) => item.assignedTo.length === 0);
 
   const handleShare = useCallback(() => {
-    let text = '🧾 Split Bill Summary\n';
+    let text = `🧾 ${t('splitBill.shareTitle')}\n`;
     text += `━━━━━━━━━━━━━━━\n`;
     items.forEach((item) => {
       text += `${item.name} × ${item.qty} — ${formatCurrency(item.price * item.qty)}\n`;
     });
     text += `━━━━━━━━━━━━━━━\n`;
-    text += `Subtotal: ${formatCurrency(subtotal)}\n`;
-    if (taxAmount) text += `Tax: ${formatCurrency(taxAmount)}\n`;
-    if (serviceAmount) text += `Service: ${formatCurrency(serviceAmount)}\n`;
-    if (discountAmount) text += `Discount: -${formatCurrency(discountAmount)}\n`;
-    text += `Total: ${formatCurrency(grandTotal)}\n\n`;
-    text += `💰 Each person owes:\n`;
+    text += `${t('splitBill.subtotal')}: ${formatCurrency(subtotal)}\n`;
+    if (taxAmount) text += `${t('splitBill.shareTax')}: ${formatCurrency(taxAmount)}\n`;
+    if (serviceAmount) text += `${t('splitBill.shareService')}: ${formatCurrency(serviceAmount)}\n`;
+    if (discountAmount) text += `${t('splitBill.shareDiscount')}: -${formatCurrency(discountAmount)}\n`;
+    text += `${t('splitBill.shareTotal')}: ${formatCurrency(grandTotal)}\n\n`;
+    text += `💰 ${t('splitBill.shareOwes')}\n`;
     people.forEach((p) => {
       text += `${p.name}: ${formatCurrency(personTotals[p.id] || 0)}\n`;
     });
@@ -333,9 +333,9 @@ export default function SplitBill() {
     if (navigator.share) {
       navigator.share({ text }).catch(() => {});
     } else {
-      navigator.clipboard.writeText(text).then(() => alert('Summary copied to clipboard!'));
+      navigator.clipboard.writeText(text).then(() => alert(t('splitBill.copied')));
     }
-  }, [items, people, personTotals, subtotal, taxAmount, serviceAmount, discountAmount, grandTotal]);
+  }, [items, people, personTotals, subtotal, taxAmount, serviceAmount, discountAmount, grandTotal, t]);
 
   return (
     <>

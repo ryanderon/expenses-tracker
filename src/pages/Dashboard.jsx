@@ -14,11 +14,11 @@ import { useT, useDateFormat } from '@/hooks/useT';
 import usePortfolio from '@/hooks/usePortfolio';
 import usePrices from '@/hooks/usePrices';
 import { useMonthFilter } from '@/hooks/useCycle';
-import { getAllCategories } from '@/lib/constants';
-import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
+import { getAllCategories, isNeutralType } from '@/lib/constants';
+import { categoryLabel, topSubcategoryRows } from '@/lib/i18n';
 import {
   calculateTotals, formatCurrency,
-  groupBySubcategory, getMonthsInYear, getAccountBalance, cn,
+  getMonthsInYear, getAccountBalance, cn,
   getMonthKey,
 } from '@/lib/utils';
 
@@ -46,38 +46,41 @@ export default function Dashboard() {
     () => filterByMonth(transactions, month),
     [filterByMonth, transactions, month]
   );
-  const totals = useMemo(() => calculateTotals(monthTx, allCategories), [monthTx, allCategories]);
+  const totals = useMemo(
+    () => calculateTotals(monthTx, allCategories, accounts),
+    [monthTx, allCategories, accounts]
+  );
 
   const outflow = totals.expenses + totals.savings + totals.investments;
 
   // --- Spending breakdown: every non-income category with a value ----------
   const breakdown = useMemo(() => {
     const rows = Object.entries(allCategories)
-      .filter(([, c]) => c.type !== 'income' && c.type !== 'transfer')
+      .filter(([, c]) => c.type !== 'income' && !isNeutralType(c.type))
       .map(([key, c]) => ({
         key,
         label: categoryLabel(c, t),
         color: c.hex,
-        value: monthTx.filter((x) => x.category === key).reduce((s, x) => s + x.amount, 0),
+        // Savings includes what the savings accounts grew by, as in the totals.
+        value: monthTx.filter((x) => x.category === key).reduce((s, x) => s + x.amount, 0)
+          + (key === 'savings' ? totals.savedInAccounts : 0),
       }))
       .filter((r) => r.value > 0)
       .sort((a, b) => b.value - a.value);
     const total = rows.reduce((s, r) => s + r.value, 0);
     return { rows, total };
-  }, [monthTx, allCategories, t]);
+  }, [monthTx, allCategories, totals.savedInAccounts, t]);
 
   // --- Top spending subcategories ----------------------------------------
   const topSpending = useMemo(() => {
     const expTx = monthTx.filter((x) => allCategories[x.category]?.type === 'expense');
-    const rows = Object.entries(groupBySubcategory(expTx))
-      .sort((a, b) => b[1].total - a[1].total)
-      .slice(0, 5);
-    const max = rows[0]?.[1].total || 1;
+    const rows = topSubcategoryRows(expTx, allCategories, t, 5);
+    const max = rows[0]?.total || 1;
     const palette = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
-    return rows.map(([name, data], i) => ({
-      label: subcategoryLabel(name, t),
-      value: data.total,
-      pct: Math.round((data.total / max) * 100),
+    return rows.map((r, i) => ({
+      label: r.label,
+      value: r.total,
+      pct: Math.round((r.total / max) * 100),
       color: palette[i % palette.length],
     }));
   }, [monthTx, allCategories, t]);
@@ -96,14 +99,14 @@ export default function Dashboard() {
   const year = Number(month.slice(0, 4));
   const trend = useMemo(
     () => getMonthsInYear(year).map((mk) => {
-      const mt = calculateTotals(filterByMonth(transactions, mk), allCategories);
+      const mt = calculateTotals(filterByMonth(transactions, mk), allCategories, accounts);
       return {
         month: dates.monthShort(`${mk}-01`).split(' ')[0],
         income: mt.income,
         expenses: mt.expenses + mt.savings + mt.investments,
       };
     }),
-    [filterByMonth, transactions, year, allCategories, dates]
+    [filterByMonth, transactions, year, allCategories, accounts, dates]
   );
 
   const balances = useMemo(

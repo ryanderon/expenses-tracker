@@ -7,16 +7,18 @@ import useStore from '@/store/useStore';
 import { useT } from '@/hooks/useT';
 
 // Steps reference i18n keys; the copy itself lives in the locale files.
+// `target` may be a list: the first one that's actually on screen wins, which
+// is how a step points at the sidebar on desktop and the bottom bar on a phone.
 const TOUR_STEPS = [
   {
-    route: '/',
+    route: '/today',
     target: '[data-tour="today-hero"]',
     titleKey: 'tour.todayTitle',
     bodyKey: 'tour.todayBody',
     position: 'bottom',
   },
   {
-    route: '/',
+    route: '/today',
     target: '[data-tour="today-add"]',
     titleKey: 'tour.addTitle',
     bodyKey: 'tour.addBody',
@@ -37,19 +39,40 @@ const TOUR_STEPS = [
     position: 'bottom',
   },
   {
-    route: '/more',
-    target: '[data-tour="more-list"]',
+    route: '/',
+    target: [
+      { selector: '[data-tour="nav-sidebar"]', position: 'right' },
+      { selector: '[data-tour="nav-more"]', position: 'top' },
+    ],
     titleKey: 'tour.moreTitle',
     bodyKey: 'tour.moreBody',
     position: 'top',
   },
 ];
 
+/** The step's target element and tooltip side, skipping candidates that aren't rendered. */
+function resolveTarget(step) {
+  const candidates = Array.isArray(step.target)
+    ? step.target
+    : [{ selector: step.target, position: step.position }];
+  for (const c of candidates) {
+    const el = document.querySelector(c.selector);
+    if (el && el.getClientRects().length > 0) return { el, position: c.position || step.position };
+  }
+  return null;
+}
+
 /** Size assumed before the tooltip has been measured once. */
 const DEFAULT_TOOLTIP_SIZE = { width: 320, height: 160 };
 
 function getTooltipStyle(rect, position, size) {
-  if (!rect) return { top: 0, left: 0 };
+  // No element to point at: sit in the middle of the screen instead.
+  if (!rect) {
+    return {
+      top: Math.max((window.innerHeight - size.height) / 2, 12),
+      left: Math.max((window.innerWidth - size.width) / 2, 12),
+    };
+  }
 
   const tooltipWidth = size.width;
   const tooltipHeight = size.height;
@@ -100,6 +123,10 @@ export default function Tour() {
   const [step, setStep] = useState(0);
   const t = useT();
   const [targetRect, setTargetRect] = useState(null);
+  const [targetPosition, setTargetPosition] = useState(null);
+  // The step's element isn't on this page (e.g. it depends on data the user
+  // doesn't have yet). The card still shows, centred, so the tour can't stall.
+  const [targetMissing, setTargetMissing] = useState(false);
   const [tooltipSize, setTooltipSize] = useState(DEFAULT_TOOLTIP_SIZE);
 
   // The tooltip is positioned from its own measured size, so it has to be
@@ -132,16 +159,18 @@ export default function Tour() {
 
   const measureTarget = useCallback(() => {
     if (!currentStep) return;
-    const el = document.querySelector(currentStep.target);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const found = resolveTarget(currentStep);
+    if (found) {
+      found.el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       // Wait for scroll to finish
       setTimeout(() => {
-        const rect = el.getBoundingClientRect();
-        setTargetRect(rect);
+        setTargetRect(found.el.getBoundingClientRect());
+        setTargetPosition(found.position);
+        setTargetMissing(false);
       }, 300);
     } else {
       setTargetRect(null);
+      setTargetMissing(true);
     }
   }, [currentStep]);
 
@@ -201,7 +230,7 @@ export default function Tour() {
 
   if (!active || !currentStep) return null;
 
-  const tooltipPos = getTooltipStyle(targetRect, currentStep.position, tooltipSize);
+  const tooltipPos = getTooltipStyle(targetRect, targetPosition || currentStep.position, tooltipSize);
 
   return (
     <div className="fixed inset-0 z-[100]">
@@ -253,7 +282,7 @@ export default function Tour() {
       )}
 
       {/* Tooltip card */}
-      {targetRect && (
+      {(targetRect || targetMissing) && (
         <div
           ref={tooltipRef}
           role="dialog"

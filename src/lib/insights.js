@@ -1,8 +1,8 @@
-import { startOfDay, subDays } from 'date-fns';
-import { getAllCategories } from '@/lib/constants';
+import { startOfDay, subDays, addDays } from 'date-fns';
+import { getAllCategories, isInvestmentAccount } from '@/lib/constants';
 import {
   formatCurrency, getMonthKey, getMonthRange, getPeriodDays, getPeriodDayIndex,
-  isCurrentPeriod, getAccountBalance,
+  isCurrentPeriod, getAccountBalance, savingsAccountIds, savingsEffect,
 } from '@/lib/utils';
 import { buildBudgetReport, shiftMonth, subKey } from '@/lib/budget';
 import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
@@ -22,9 +22,9 @@ const LOOKBACK = 6;
 const DAY_MS = 86_400_000;
 const SMALL_TX = 50_000;
 const WEEKEND_WINDOW_DAYS = 56;
+/** A first transaction this soon after a period starts still counts as tracking that period. */
+const TRACKING_GRACE_DAYS = 3;
 
-/** Account types that hold money you can't spend tomorrow. */
-const ILLIQUID_ACCOUNT = /invest|saham|stock|reksa|crypto|kripto|bibit|pension|pensiun/i;
 
 const clamp01 = (n) => Math.min(Math.max(n, 0), 1);
 const sum = (xs) => xs.reduce((s, x) => s + x, 0);
@@ -51,7 +51,7 @@ function dayInPeriod(date, start) {
  * Totals for one period. `cutoff` limits it to the first N days, which is how
  * "so far this month" gets compared like for like with earlier months.
  */
-function summarise(txs, monthKey, allCategories, cutoff = Infinity) {
+function summarise(txs, monthKey, allCategories, savingsIds, cutoff = Infinity) {
   const { start } = getMonthRange(monthKey);
   const out = {
     income: 0, expense: 0, saved: 0, count: 0,
@@ -63,6 +63,8 @@ function summarise(txs, monthKey, allCategories, cutoff = Infinity) {
     const day = dayInPeriod(t.date, start);
     if (day > cutoff) continue;
     const type = allCategories[t.category]?.type;
+    // Growth of the savings accounts is setting money aside too.
+    out.saved += savingsEffect(t, savingsIds, allCategories);
 
     if (type === 'income') out.income += t.amount;
     else if (type === 'savings' || type === 'investment') out.saved += t.amount;
@@ -116,12 +118,12 @@ export function buildInsights(state, { monthKey, t, now = new Date() }) {
   const allCategories = getAllCategories(customCategories);
   const fmt = formatCurrency;
 
-  /** "Other" alone is meaningless, so it borrows its category's name. */
+  /** "Other" alone is meaningless, so it takes its category: "Other · Expenses". */
   const nameOf = (key) => {
     const [cat, sub] = splitKey(key);
-    return sub && sub !== 'Other'
-      ? subcategoryLabel(sub, t)
-      : categoryLabel(allCategories[cat], t) || cat;
+    const category = categoryLabel(allCategories[cat], t) || cat;
+    if (!sub) return category;
+    return sub === 'Other' ? `${subcategoryLabel(sub, t)} · ${category}` : subcategoryLabel(sub, t);
   };
 
   const byMonth = {};
@@ -132,12 +134,21 @@ export function buildInsights(state, { monthKey, t, now = new Date() }) {
   const dayIndex = isCurrent ? getPeriodDayIndex(monthKey, now) : totalDays;
   const cutoff = isCurrent ? dayIndex : Infinity;
 
+  // A period only counts as history if tracking had begun by its start. The
+  // period someone started logging in has a few days of data, and treating it
+  // as a whole month would make every "usual" figure look tiny next to now.
+  const firstLogged = transactions.reduce(
+    (min, tx) => (String(tx.date) < min ? String(tx.date) : min),
+    '9999-12-31'
+  );
+  const trackedFrom = startOfDay(addDays(new Date(firstLogged), -TRACKING_GRACE_DAYS));
   const priorKeys = Array.from({ length: LOOKBACK }, (_, i) => shiftMonth(monthKey, -(i + 1)))
-    .filter((m) => byMonth[m]?.length);
+    .filter((m) => byMonth[m]?.length && getMonthRange(m).start >= trackedFrom);
 
-  const cur = summarise(byMonth[monthKey] || [], monthKey, allCategories, cutoff);
-  const priorsToDate = priorKeys.map((m) => summarise(byMonth[m], m, allCategories, cutoff));
-  const priorsFull = priorKeys.map((m) => summarise(byMonth[m], m, allCategories));
+  const savingsIds = savingsAccountIds(accounts);
+  const cur = summarise(byMonth[monthKey] || [], monthKey, allCategories, savingsIds, cutoff);
+  const priorsToDate = priorKeys.map((m) => summarise(byMonth[m], m, allCategories, savingsIds, cutoff));
+  const priorsFull = priorKeys.map((m) => summarise(byMonth[m], m, allCategories, savingsIds));
 
   const avgMonthlyExpense = mean(priorsFull.map((p) => p.expense));
   const avgMonthlyIncome = mean(priorsFull.filter((p) => p.income > 0).map((p) => p.income));
@@ -151,17 +162,15 @@ export function buildInsights(state, { monthKey, t, now = new Date() }) {
   const add = (item) => insights.push(item);
 
   // --- Projection ----------------------------------------------------------
-  // What the rest of the month usually costs you, added to what you've spent.
-  // Beats a straight line because it knows bills land early and weekends run
-  // hot.
-  let projected = null;
-  if (isCurrent && dayIndex < totalDays && cur.expense > 0) {
-    if (priorKeys.length >= 2) {
-      projected = cur.expense + mean(priorsFull.map((p, i) => p.expense - priorsToDate[i].expense));
-    } else if (dayIndex >= 7) {
-      projected = (cur.expense / dayIndex) * totalDays;
-    }
-  }
+  // The same end-of-period projection the Budget page shows (built from your
+  // own past periods, so early bills aren't multiplied across the month).
+  const report = buildBudgetReport({
+    monthKey, transactions, allCategories, customSubcategories, customCategories,
+    budgets, subBudgets, budgetTemplate, budgetSettings, accounts, now,
+  });
+  const projected = isCurrent && dayIndex < totalDays && cur.expense > 0
+    ? report.spending.pacing.projected
+    : null;
 
   // --- Pace vs your own usual ---------------------------------------------
   if (priorKeys.length >= 2 && cur.expense > 0) {
@@ -183,11 +192,9 @@ export function buildInsights(state, { monthKey, t, now = new Date() }) {
   }
 
   // --- Budget --------------------------------------------------------------
-  const report = buildBudgetReport({
-    monthKey, transactions, allCategories, customSubcategories, customCategories,
-    budgets, subBudgets, budgetTemplate, budgetSettings, now,
-  });
-  const budgeted = report.categories.filter((c) => c.effectiveBudget > 0);
+  // Spending limits only: savings and investment targets aren't "safe" or
+  // "blown", they're reached or not, and the Budget page shows that.
+  const budgeted = report.categories.filter((c) => c.effectiveBudget > 0 && !c.isGoal);
   const labelOf = (c) => (c.labelKey ? t(c.labelKey) : c.label);
 
   const over = budgeted.filter((c) => c.isOver).sort((a, b) => a.remaining - b.remaining);
@@ -452,7 +459,8 @@ export function buildInsights(state, { monthKey, t, now = new Date() }) {
         icon: 'priority_high',
         title: t('insights.rules.outlierTitle', { ratio: Math.round(outlier.ratio) }),
         body: t('insights.rules.outlier', {
-          name: outlier.it.description || nameOf(outlier.it.key),
+          // Notes live in `note`; `description` only exists on old imported data.
+          name: outlier.it.note || outlier.it.description || nameOf(outlier.it.key),
           amount: fmt(outlier.it.amount),
           usual: fmt(outlier.usual),
           category: nameOf(outlier.it.key),
@@ -505,7 +513,7 @@ export function buildInsights(state, { monthKey, t, now = new Date() }) {
 
   const liquid = sum(
     accounts
-      .filter((a) => !ILLIQUID_ACCOUNT.test(`${a.type} ${a.name}`))
+      .filter((a) => !isInvestmentAccount(a))
       .map((a) => Math.max(getAccountBalance(transactions, a.id, allCategories, a.openingBalance), 0))
   );
   const monthlySpend = avgMonthlyExpense || bExpense / basis.length;

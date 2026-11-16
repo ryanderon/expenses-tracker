@@ -78,3 +78,36 @@ export function subcategoryLabel(name, t) {
   // this is a user-created name, so show it as typed.
   return translated === key ? name : translated;
 }
+
+/**
+ * Top subcategories across several categories, labelled so none read alike.
+ *
+ * Grouping by subcategory name alone merges Bills › Other with Expenses ›
+ * Other into one "Other" row. So rows are keyed by category and subcategory,
+ * and a name that appears under more than one category (always the case for
+ * "Other") gets its category added: "Other · Bills".
+ */
+export function topSubcategoryRows(transactions, allCategories, t, limit) {
+  const groups = {};
+  for (const tx of transactions) {
+    const sub = tx.subcategory || 'Other';
+    const key = `${tx.category}::${sub}`;
+    groups[key] ||= { key, category: tx.category, subcategory: sub, total: 0 };
+    groups[key].total += tx.amount;
+  }
+  const all = Object.values(groups);
+  const seen = {};
+  for (const g of all) seen[g.subcategory] = (seen[g.subcategory] || 0) + 1;
+
+  return all
+    .sort((a, b) => b.total - a.total)
+    .slice(0, limit)
+    .map((g) => {
+      const name = subcategoryLabel(g.subcategory, t);
+      const ambiguous = seen[g.subcategory] > 1 || g.subcategory === 'Other';
+      return {
+        ...g,
+        label: ambiguous ? `${name} · ${categoryLabel(allCategories[g.category], t) || g.category}` : name,
+      };
+    });
+}

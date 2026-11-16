@@ -1,7 +1,8 @@
-import { format, parse, subMonths, addMonths } from 'date-fns';
-import { getSubcategories } from '@/lib/constants';
+import { format, parse, subMonths, addMonths, startOfDay } from 'date-fns';
+import { getSubcategories, isNeutralType } from '@/lib/constants';
 import {
-  getMonthKey, getPeriodDays, getPeriodDayIndex, isCurrentPeriod,
+  getMonthKey, getMonthRange, getPeriodDays, getPeriodDayIndex, isCurrentPeriod,
+  savingsAccountIds, savingsEffect,
 } from '@/lib/utils';
 
 /** Composite key for a subcategory budget, e.g. `expenses::Dining Out`. */
@@ -61,10 +62,18 @@ function getPlannedBudget(monthKey, category, config, subNames = []) {
   };
 }
 
-function spentIn(transactions, monthKey, category) {
+/**
+ * What a category used in a month. For the built-in Savings category that
+ * includes the net growth of the savings accounts (`savings.ids`), since a
+ * transfer into one is how most saving actually happens.
+ */
+function spentIn(transactions, monthKey, category, savings) {
   let total = 0;
+  const countGrowth = category === 'savings' && savings?.ids.length;
   for (const t of transactions) {
-    if (t.category === category && getMonthKey(t.date) === monthKey) total += t.amount;
+    if (getMonthKey(t.date) !== monthKey) continue;
+    if (t.category === category) total += t.amount;
+    if (countGrowth) total += savingsEffect(t, savings.ids, savings.allCategories);
   }
   return total;
 }
@@ -80,13 +89,23 @@ function spentInSub(transactions, monthKey, category, sub) {
 }
 
 /** Earliest month with any transaction, or null when there's no history. */
+/**
+ * The first period the data fully covers, or null when there's no history.
+ * The period someone started logging in usually has only a few days in it;
+ * counting it would make an untouched budget look like a huge surplus.
+ * A first entry within 3 days of a period's start still counts as covering it.
+ */
 function getEarliestMonth(transactions) {
-  let earliest = null;
+  let first = null;
   for (const t of transactions) {
-    const m = getMonthKey(t.date);
-    if (earliest === null || m < earliest) earliest = m;
+    const day = String(t.date).slice(0, 10);
+    if (first === null || day < first) first = day;
   }
-  return earliest;
+  if (!first) return null;
+  const month = getMonthKey(first);
+  const { start } = getMonthRange(month);
+  const covered = startOfDay(new Date(first)) - start <= 3 * 86_400_000;
+  return covered ? month : shiftMonth(month, 1);
 }
 
 /**
@@ -102,7 +121,7 @@ function getEarliestMonth(transactions) {
  * untouched budget and invent an enormous surplus.
  */
 function computeRollover(
-  monthKey, category, config, subNames, transactions, settings, earliestMonth
+  monthKey, category, config, subNames, transactions, settings, earliestMonth, savings
 ) {
   if (!settings?.rolloverEnabled) return 0;
   if (settings?.rolloverExcluded?.[category]) return 0;
@@ -119,7 +138,7 @@ function computeRollover(
     const { planned } = getPlannedBudget(month, category, config, subNames);
     // A month with no budget set can't generate surplus.
     if (planned > 0) {
-      carry += planned - spentIn(transactions, month, category);
+      carry += planned - spentIn(transactions, month, category, savings);
       if (!carryDeficit && carry < 0) carry = 0;
     }
     month = shiftMonth(month, 1);
@@ -133,7 +152,46 @@ function computeRollover(
  * `expectedPct` is straight-line pacing against elapsed days; `projected` is
  * the current burn rate extrapolated to month end.
  */
-function getPacing(monthKey, spent, effectiveBudget, now = new Date()) {
+const PROJECTION_HISTORY = 3;
+const DAY_MS = 86_400_000;
+
+/**
+ * Where spending is heading by the end of the current period, using the
+ * user's own pattern: in up to three earlier, fully tracked periods, how much
+ * was spent after the same share of the period had passed. That knows bills
+ * and big transfers land early; a straight line would multiply them across
+ * the whole period. With no such history, it falls back to the straight line.
+ *
+ * `include(t)` picks the transactions being projected (one category, or all
+ * expense-type spending).
+ */
+function projectSpend(transactions, monthKey, spentSoFar, include, earliestMonth, now) {
+  if (!isCurrentPeriod(monthKey, now)) return spentSoFar;
+  const totalDays = getPeriodDays(monthKey);
+  const elapsed = getPeriodDayIndex(monthKey, now);
+  const share = elapsed / totalDays;
+
+  const rests = [];
+  for (let i = 1; i <= PROJECTION_HISTORY; i++) {
+    const month = shiftMonth(monthKey, -i);
+    if (!earliestMonth || month < earliestMonth) break;
+    const start = getMonthRange(month).start;
+    const cutoff = share * getPeriodDays(month);
+    let rest = 0;
+    let tracked = false;
+    for (const t of transactions) {
+      if (getMonthKey(t.date) !== month) continue;
+      tracked = true;
+      const day = Math.floor((startOfDay(new Date(t.date)) - start) / DAY_MS) + 1;
+      if (day > cutoff && include(t)) rest += t.amount;
+    }
+    if (tracked) rests.push(rest);
+  }
+  if (rests.length) return Math.round(spentSoFar + rests.reduce((a, b) => a + b, 0) / rests.length);
+  return elapsed > 0 ? Math.round((spentSoFar / elapsed) * totalDays) : 0;
+}
+
+function getPacing(monthKey, spent, effectiveBudget, now = new Date(), projectedOverride) {
   const totalDays = getPeriodDays(monthKey);
   const isCurrent = isCurrentPeriod(monthKey, now);
   const isFuture = monthKey > getMonthKey(now);
@@ -142,7 +200,8 @@ function getPacing(monthKey, spent, effectiveBudget, now = new Date()) {
   const daysLeft = Math.max(totalDays - elapsedDays, 0);
   const elapsedPct = Math.round((elapsedDays / totalDays) * 100);
 
-  const projected = elapsedDays > 0 ? Math.round((spent / elapsedDays) * totalDays) : 0;
+  const projected = projectedOverride
+    ?? (elapsedDays > 0 ? Math.round((spent / elapsedDays) * totalDays) : 0);
   const remaining = effectiveBudget - spent;
   const dailySafe = daysLeft > 0 && remaining > 0 ? Math.floor(remaining / daysLeft) : 0;
 
@@ -175,7 +234,11 @@ function getPacing(monthKey, spent, effectiveBudget, now = new Date()) {
  * Underspending yesterday therefore raises today's allowance on its own; there
  * is no separate carry-over to track.
  */
-export function getDailyAllowance(monthKey, totalBudget, transactions, allCategories, now = new Date()) {
+export function getDailyAllowance(monthKey, spendBudget, transactions, allCategories, now = new Date()) {
+  // Day-to-day money only: the budgets and spending of expense-type
+  // categories. Savings and investment targets aren't something to spend, and
+  // saving more than planned mustn't shrink what's left for today.
+  const totalBudget = spendBudget;
   const totalDays = getPeriodDays(monthKey);
   const isCurrent = isCurrentPeriod(monthKey, now);
 
@@ -184,8 +247,7 @@ export function getDailyAllowance(monthKey, totalBudget, transactions, allCatego
   let spentToday = 0;
 
   for (const t of transactions) {
-    const type = allCategories[t.category]?.type;
-    if (type === 'income' || type === 'transfer') continue;
+    if (allCategories[t.category]?.type !== 'expense') continue;
     if (getMonthKey(t.date) !== monthKey) continue;
 
     const day = String(t.date).slice(0, 10);
@@ -232,28 +294,37 @@ export function buildBudgetReport({
   subBudgets = {},
   budgetTemplate = { categories: {}, subcategories: {} },
   budgetSettings = {},
+  accounts = [],
   now = new Date(),
 }) {
   const config = { budgets, subBudgets, budgetTemplate };
+  const savings = { ids: savingsAccountIds(accounts), allCategories };
   const alertThreshold = budgetSettings.alertThreshold ?? 80;
   // Computed once and shared — every category would otherwise rescan the
   // whole transaction list to find it.
   const earliestMonth = getEarliestMonth(transactions);
 
   const categories = Object.entries(allCategories)
-    .filter(([, cat]) => cat.type !== 'income' && cat.type !== 'transfer')
+    .filter(([, cat]) => cat.type !== 'income' && !isNeutralType(cat.type))
     .map(([key, cat]) => {
       const subNames = getSubcategories(key, customSubcategories, customCategories);
       const plan = getPlannedBudget(monthKey, key, config, subNames);
       const rollover = computeRollover(
-        monthKey, key, config, subNames, transactions, budgetSettings, earliestMonth
+        monthKey, key, config, subNames, transactions, budgetSettings, earliestMonth, savings
       );
 
-      const spent = spentIn(transactions, monthKey, key);
+      const spent = spentIn(transactions, monthKey, key, savings);
       const effectiveBudget = plan.planned + rollover;
       const remaining = effectiveBudget - spent;
       const pctRaw = effectiveBudget > 0 ? Math.round((spent / effectiveBudget) * 100) : 0;
-      const pacing = getPacing(monthKey, spent, effectiveBudget, now);
+      // Savings and investments are targets, not limits: reaching or passing
+      // one is good news, and a lump sum moved on payday isn't a daily pace.
+      const isGoal = cat.type === 'savings' || cat.type === 'investment';
+      const projectedSpend = isGoal
+        ? undefined
+        : projectSpend(transactions, monthKey, spent, (t) => t.category === key, earliestMonth, now);
+      const rawPacing = getPacing(monthKey, spent, effectiveBudget, now, projectedSpend);
+      const pacing = isGoal ? { ...rawPacing, projectedOver: false, aheadOfPace: false } : rawPacing;
 
       const subcategories = plan.subs
         .map((s) => {
@@ -270,14 +341,18 @@ export function buildBudgetReport({
         // would otherwise be mostly empty rows.
         .filter((s) => s.amount > 0 || s.spent > 0);
 
-      const isOver = effectiveBudget > 0 && spent > effectiveBudget;
-      const isNearLimit = !isOver && effectiveBudget > 0 && pctRaw >= alertThreshold;
+      const isOver = !isGoal && effectiveBudget > 0 && spent > effectiveBudget;
+      const isNearLimit = !isGoal && !isOver && effectiveBudget > 0 && pctRaw >= alertThreshold;
+      const reached = isGoal && effectiveBudget > 0 && spent >= effectiveBudget;
 
       return {
         key,
         label: cat.label,
         // Carried through so callers can translate built-in category names.
         labelKey: cat.labelKey,
+        type: cat.type,
+        isGoal,
+        reached,
         color: cat.color,
         hex: cat.hex,
         planned: plan.planned,
@@ -306,6 +381,28 @@ export function buildBudgetReport({
   const totalRollover = categories.reduce((s, c) => s + c.rollover, 0);
   const totalBudget = totalPlanned + totalRollover;
   const totalSpent = categories.reduce((s, c) => s + c.spent, 0);
+  // Spending on its own: limits and use of expense-type categories. This is
+  // what the overall gauge and the daily allowance are about; savings and
+  // investment targets are reported separately as goals.
+  const spendCats = categories.filter((c) => c.type === 'expense');
+  const spendBudget = spendCats.reduce((s, c) => s + c.effectiveBudget, 0);
+  const spendSpent = spendCats.reduce((s, c) => s + c.spent, 0);
+  const spendPctRaw = spendBudget > 0 ? Math.round((spendSpent / spendBudget) * 100) : 0;
+  const spending = {
+    budget: spendBudget,
+    spent: spendSpent,
+    remaining: spendBudget - spendSpent,
+    pctRaw: spendPctRaw,
+    pct: Math.min(spendPctRaw, 100),
+    isOver: spendBudget > 0 && spendSpent > spendBudget,
+    pacing: getPacing(
+      monthKey, spendSpent, spendBudget, now,
+      projectSpend(
+        transactions, monthKey, spendSpent,
+        (t) => allCategories[t.category]?.type === 'expense', earliestMonth, now
+      )
+    ),
+  };
 
   return {
     monthKey,
@@ -315,6 +412,8 @@ export function buildBudgetReport({
     totalRollover,
     totalBudget,
     totalSpent,
+    spendBudget,
+    spending,
     totalRemaining: totalBudget - totalSpent,
     totalPct: totalBudget > 0 ? Math.min(Math.round((totalSpent / totalBudget) * 100), 100) : 0,
     totalPctRaw: totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0,

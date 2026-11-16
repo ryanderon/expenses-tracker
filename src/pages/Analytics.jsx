@@ -1,18 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import {
-  Panel, PanelTitle, StackedBar, LegendRow, Meter, SegmentedTabs,
+  Panel, PanelTitle, StackedBar, LegendRow, Meter,
 } from '@/components/ui/design';
 import PageHeader from '@/components/PageHeader';
-import { MonthField } from '@/components/ui/date-fields';
+import { ReportPeriodControls } from '@/components/ui/date-fields';
+import useReportPeriod from '@/hooks/useReportPeriod';
 import useStore from '@/store/useStore';
 import { useT, useDateFormat } from '@/hooks/useT';
 import { useMonthFilter } from '@/hooks/useCycle';
-import { getAllCategories } from '@/lib/constants';
-import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
+import { getAllCategories, isNeutralType } from '@/lib/constants';
+import { categoryLabel, topSubcategoryRows } from '@/lib/i18n';
 import {
-  filterTransactionsByYear, calculateTotals,
-  formatCurrency, groupBySubcategory, getMonthsInYear, cn,
-  getMonthKey,
+  calculateTotals, formatCurrency, getMonthsInYear, cn,
 } from '@/lib/utils';
 
 /** Grouped vertical bars — the design's "Monthly Comparison" panel. */
@@ -62,56 +61,53 @@ function ComparisonBars({ months, t }) {
 export default function Analytics() {
   const t = useT();
   const dates = useDateFormat();
-  const [view, setView] = useState('monthly');
-  const [month, setMonth] = useState(() => getMonthKey(new Date()));
+  const period = useReportPeriod();
+  const { activeTx, chartYear: year } = period;
   const filterByMonth = useMonthFilter();
 
   const transactions = useStore((s) => s.transactions);
+  const accounts = useStore((s) => s.accounts);
   const customCategories = useStore((s) => s.customCategories);
   const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
-
-  const year = Number(month.slice(0, 4));
-  const activeTx = useMemo(
-    () => (view === 'yearly'
-      ? filterTransactionsByYear(transactions, year)
-      : filterByMonth(transactions, month)),
-    [filterByMonth, transactions, view, year, month]
+  const totals = useMemo(
+    () => calculateTotals(activeTx, allCategories, accounts),
+    [activeTx, allCategories, accounts]
   );
-  const totals = useMemo(() => calculateTotals(activeTx, allCategories), [activeTx, allCategories]);
   const outflow = totals.expenses + totals.savings + totals.investments;
 
   const distribution = useMemo(() => {
+    // Where the money went: income isn't a share of that, so it stays out.
     const rows = Object.entries(allCategories)
-      .filter(([, c]) => c.type !== 'transfer')
+      .filter(([, c]) => c.type !== 'income' && !isNeutralType(c.type))
       .map(([key, c]) => ({
         key,
         label: categoryLabel(c, t),
         color: c.hex,
-        value: activeTx.filter((x) => x.category === key).reduce((s, x) => s + x.amount, 0),
+        // Savings includes what the savings accounts grew by, as in the totals.
+        value: activeTx.filter((x) => x.category === key).reduce((s, x) => s + x.amount, 0)
+          + (key === 'savings' ? totals.savedInAccounts : 0),
       }))
       .filter((r) => r.value > 0)
       .sort((a, b) => b.value - a.value);
     return { rows, total: rows.reduce((s, r) => s + r.value, 0) };
-  }, [activeTx, allCategories, t]);
+  }, [activeTx, allCategories, totals.savedInAccounts, t]);
 
   const expenseBars = useMemo(() => {
     const expTx = activeTx.filter((x) => allCategories[x.category]?.type === 'expense');
-    const rows = Object.entries(groupBySubcategory(expTx))
-      .sort((a, b) => b[1].total - a[1].total)
-      .slice(0, 6);
-    const max = rows[0]?.[1].total || 1;
+    const rows = topSubcategoryRows(expTx, allCategories, t, 6);
+    const max = rows[0]?.total || 1;
     const palette = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
-    return rows.map(([name, data], i) => ({
-      label: subcategoryLabel(name, t),
-      value: data.total,
-      pct: Math.round((data.total / max) * 100),
+    return rows.map((r, i) => ({
+      label: r.label,
+      value: r.total,
+      pct: Math.round((r.total / max) * 100),
       color: palette[i % palette.length],
     }));
   }, [activeTx, allCategories, t]);
 
   const comparison = useMemo(
     () => getMonthsInYear(year).map((mk) => {
-      const mt = calculateTotals(filterByMonth(transactions, mk), allCategories);
+      const mt = calculateTotals(filterByMonth(transactions, mk), allCategories, accounts);
       return {
         label: dates.monthShort(`${mk}-01`).split(' ')[0],
         income: mt.income,
@@ -119,14 +115,17 @@ export default function Analytics() {
         savings: mt.savings,
       };
     }).filter((m) => m.income + m.expenses + m.savings > 0),
-    [filterByMonth, transactions, year, allCategories, dates]
+    [filterByMonth, transactions, year, allCategories, accounts, dates]
   );
 
   const categoryMix = useMemo(() => {
     if (totals.income <= 0) return [];
+    // Bills are expense-type too, so they come out of the expense total here
+    // rather than being counted in both rows.
+    const bills = activeTx.filter((x) => x.category === 'bills').reduce((s, x) => s + x.amount, 0);
     return [
-      { label: t('categoriesData.bills'), value: activeTx.filter((x) => x.category === 'bills').reduce((s, x) => s + x.amount, 0), color: 'var(--amber)' },
-      { label: t('categoriesData.expenses'), value: totals.expenses, color: 'var(--danger)' },
+      { label: t('categoriesData.bills'), value: bills, color: 'var(--amber)' },
+      { label: t('categoriesData.expenses'), value: totals.expenses - bills, color: 'var(--danger)' },
       { label: t('categoriesData.savings'), value: totals.savings, color: 'var(--teal)' },
       { label: t('categoriesData.investments'), value: totals.investments, color: 'var(--violet)' },
     ].map((c) => ({ ...c, pct: Math.round((c.value / totals.income) * 100) }));
@@ -139,8 +138,9 @@ export default function Analytics() {
   const quickStats = [
     { label: t('analytics.totalTransactions'), value: String(activeTx.length) },
     {
-      label: t('analytics.avgTransaction'),
-      value: formatCurrency(activeTx.length ? activeTx.reduce((s, x) => s + x.amount, 0) / activeTx.length : 0),
+      // Spending only: averaging in salaries and transfers says nothing.
+      label: t('analytics.avgExpense'),
+      value: formatCurrency(expenseTx.length ? expenseTx.reduce((s, x) => s + x.amount, 0) / expenseTx.length : 0),
     },
     {
       label: t('analytics.largestExpense'),
@@ -162,17 +162,7 @@ export default function Analytics() {
     <>
       <PageHeader
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <SegmentedTabs
-              value={view}
-              onChange={setView}
-              options={[
-                { value: 'monthly', label: t('reports.monthly') },
-                { value: 'yearly', label: t('reports.yearly') },
-              ]}
-            />
-            <MonthField value={month} onChange={setMonth} />
-          </div>
+          <ReportPeriodControls period={period} />
         }
       />
 

@@ -183,6 +183,8 @@
   --color-teal-soft: var(--teal-soft);
   --color-violet: var(--violet);
   --color-violet-soft: var(--violet-soft);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
   --color-amber: var(--amber);
   --color-amber-soft: var(--amber-soft);
   --color-danger: var(--danger);
@@ -254,6 +256,8 @@
   --teal-soft: oklch(0.6 0.09 195 / 0.10);
   --violet: oklch(0.54 0.2 300);
   --violet-soft: oklch(0.56 0.12 300 / 0.10);
+  --sky: oklch(0.52 0.14 245);
+  --sky-soft: oklch(0.6 0.09 245 / 0.10);
   --amber: oklch(0.57 0.18 65);
   --amber-soft: oklch(0.68 0.11 70 / 0.12);
   --danger: oklch(0.55 0.2 23);
@@ -304,6 +308,8 @@
   --teal-soft: oklch(0.73 0.10 195 / 0.16);
   --violet: oklch(0.73 0.13 300);
   --violet-soft: oklch(0.73 0.13 300 / 0.16);
+  --sky: oklch(0.74 0.11 245);
+  --sky-soft: oklch(0.74 0.11 245 / 0.16);
   --amber: oklch(0.78 0.12 70);
   --amber-soft: oklch(0.78 0.12 70 / 0.16);
   --danger: oklch(0.68 0.15 25);

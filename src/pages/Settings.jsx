@@ -20,7 +20,7 @@ import useStore from '@/store/useStore';
 import { useBackup } from '@/hooks/useGoogleBackup';
 import { verifyApiKey, describeAiError } from '@/lib/ai';
 import {
-  AI_PROVIDERS, EFFORT_LEVELS, getModelInfo, getProviderInfo, modelsFor,
+  AI_PROVIDERS, DEFAULT_EFFORT, EFFORT_LEVELS, getModelInfo, getProviderInfo, modelsFor,
 } from '@/lib/aiModels';
 import { PRICE_BUDGET } from '@/lib/prices';
 import { getStorageSize } from '@/lib/idbStorage';
@@ -90,6 +90,7 @@ function LanguageSection() {
 function CycleSection() {
   const t = useT();
   const startDay = useStore((s) => s.budgetSettings?.cycleStartDay) || 1;
+  const followPaycheck = useStore((s) => !!s.budgetSettings?.cycleFollowPaycheck);
   const setBudgetSetting = useStore((s) => s.setBudgetSetting);
   const periodLabel = usePeriodLabel();
 
@@ -130,6 +131,30 @@ function CycleSection() {
         />
         <p className="text-xs text-muted-foreground">{t('settings.cycleMax')}</p>
       </div>
+
+      {/* Salaries paid early for a weekend or holiday open the period they belong to. */}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={followPaycheck}
+        onClick={() => setBudgetSetting('cycleFollowPaycheck', !followPaycheck)}
+        className="flex items-start gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:bg-secondary/40"
+      >
+        <span
+          className={cn(
+            'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border border-border',
+            followPaycheck && 'border-primary bg-primary text-primary-foreground'
+          )}
+        >
+          {followPaycheck && <Check className="size-3.5" />}
+        </span>
+        <span>
+          <span className="block text-sm font-medium">{t('settings.cycleFollowPaycheck')}</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            {t('settings.cycleFollowPaycheckHint', { day: startDay })}
+          </span>
+        </span>
+      </button>
 
       <div className="rounded-lg bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
         {t('settings.cycleCurrent')}{' '}
@@ -301,7 +326,7 @@ function AiSection() {
           <div className="flex flex-col gap-2">
             <Label className="text-xs">{t('settings.effort')}</Label>
             <Select
-              value={aiSettings.effort || 'high'}
+              value={aiSettings.effort || DEFAULT_EFFORT}
               onValueChange={(v) => setAiSettings({ effort: v })}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>

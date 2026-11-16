@@ -4,7 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Icon, SegmentedTabs } from '@/components/ui/design';
 import { useT, useDateFormat } from '@/hooks/useT';
-import { usePeriodLabel } from '@/hooks/useCycle';
+import { usePeriodLabel, usePeriodValueLabel, useYearLabel } from '@/hooks/useCycle';
 import { shiftMonth as shiftMonthKey } from '@/lib/budget';
 import { cn, getMonthKey, getMonthRange } from '@/lib/utils';
 
@@ -141,20 +141,14 @@ export function DateField({ value, onChange, className, align = 'start' }) {
 export function PeriodField({ value, onChange, className, align = 'end' }) {
   const t = useT();
   const dates = useDateFormat();
-  const periodLabel = usePeriodLabel();
+  const valueLabel = usePeriodValueLabel();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState(value.mode);
   const [year, setYear] = useState(() => Number((value.month || '').slice(0, 4)) || new Date().getFullYear());
   const [draft, setDraft] = useState();
 
   const isRange = value.mode === 'range';
-  // "20 Aug – 18 Sep 2026", not "20 Aug 2026 – 18 Sep 2026": the year only
-  // earns its place when the range actually crosses one.
-  const label = isRange
-    ? `${value.from.slice(0, 4) === value.to.slice(0, 4)
-        ? format(parse(value.from, 'yyyy-MM-dd', new Date()), 'd MMM', { locale: dates.dateLocale })
-        : dates.short(value.from)} – ${dates.short(value.to)}`
-    : periodLabel(value.month);
+  const label = valueLabel(value);
 
   const presets = [
     {
@@ -309,5 +303,55 @@ export function PeriodField({ value, onChange, className, align = 'end' }) {
         )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** Year stepper. `value` is a number. Shows the cycle span when periods don't start on the 1st. */
+export function YearField({ value, onChange, className }) {
+  const t = useT();
+  const yearLabel = useYearLabel();
+  return (
+    <div className={cn(TRIGGER, 'gap-1 px-1.5', className)}>
+      <button
+        type="button"
+        onClick={() => onChange(value - 1)}
+        aria-label={t('common.prevYear')}
+        className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+      >
+        <Icon name="chevron_left" size={18} />
+      </button>
+      <span className="px-1 tabular-nums">{yearLabel(value)}</span>
+      <button
+        type="button"
+        onClick={() => onChange(value + 1)}
+        aria-label={t('common.nextYear')}
+        className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+      >
+        <Icon name="chevron_right" size={18} />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Monthly / Yearly switch plus the matching picker, for pages driven by
+ * `useReportPeriod`. Monthly keeps both a budget period and a custom range.
+ */
+export function ReportPeriodControls({ period }) {
+  const t = useT();
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <SegmentedTabs
+        value={period.view}
+        onChange={period.setView}
+        options={[
+          { value: 'monthly', label: t('reports.monthly') },
+          { value: 'yearly', label: t('reports.yearly') },
+        ]}
+      />
+      {period.view === 'yearly'
+        ? <YearField value={period.year} onChange={period.setYear} />
+        : <PeriodField value={period.period} onChange={period.setPeriod} />}
+    </div>
   );
 }

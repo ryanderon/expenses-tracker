@@ -2,6 +2,19 @@ import * as XLSX from 'xlsx';
 import { CATEGORIES } from './constants';
 import { formatCurrency, formatDate } from './utils';
 
+/** Receivable repayments count against what's owed, so a sheet total is what's still out. */
+function signedAmount(t) {
+  return CATEGORIES[t.category]?.type === 'receivable' && t.flow === 'in' ? -t.amount : t.amount;
+}
+
+function exportType(t) {
+  const type = CATEGORIES[t.category]?.type;
+  if (type === 'income') return 'Income';
+  if (type === 'transfer') return 'Transfer';
+  if (type === 'receivable') return t.flow === 'in' ? 'Receivable (paid back)' : 'Receivable (out)';
+  return 'Expense';
+}
+
 export function exportToExcel(transactions, accounts, filename = 'financial-report') {
   const wb = XLSX.utils.book_new();
 
@@ -11,9 +24,9 @@ export function exportToExcel(transactions, accounts, filename = 'financial-repo
       Category: CATEGORIES[t.category]?.label || t.category,
       Subcategory: t.subcategory,
       Account: accounts.find((a) => a.id === t.account)?.name || t.account,
-      Description: t.description,
+      Description: t.note || t.description,
       Amount: t.amount,
-      Type: t.category === 'income' ? 'Income' : t.category === 'transfer' ? 'Transfer' : 'Expense',
+      Type: exportType(t),
     };
     if (t.toAccount) {
       row['To Account'] = accounts.find((a) => a.id === t.toAccount)?.name || t.toAccount;
@@ -28,7 +41,7 @@ export function exportToExcel(transactions, accounts, filename = 'financial-repo
   ];
   XLSX.utils.book_append_sheet(wb, wsAll, 'All Transactions');
 
-  const categories = ['income', 'bills', 'expenses', 'savings', 'investments', 'transfer'];
+  const categories = ['income', 'bills', 'expenses', 'savings', 'investments', 'receivables', 'transfer'];
   for (const cat of categories) {
     const catTx = transactions.filter((t) => t.category === cat);
     if (catTx.length === 0) continue;
@@ -37,11 +50,11 @@ export function exportToExcel(transactions, accounts, filename = 'financial-repo
       Date: formatDate(t.date),
       Subcategory: t.subcategory,
       Account: accounts.find((a) => a.id === t.account)?.name || t.account,
-      Description: t.description,
-      Amount: t.amount,
+      Description: t.note || t.description,
+      Amount: signedAmount(t),
     }));
 
-    const total = catTx.reduce((s, t) => s + t.amount, 0);
+    const total = catTx.reduce((s, t) => s + signedAmount(t), 0);
     catData.push({ Date: '', Subcategory: '', Account: '', Description: 'TOTAL', Amount: total });
 
     const ws = XLSX.utils.json_to_sheet(catData);
@@ -52,13 +65,13 @@ export function exportToExcel(transactions, accounts, filename = 'financial-repo
   const summaryData = categories.map((cat) => {
     const total = transactions
       .filter((t) => t.category === cat)
-      .reduce((s, t) => s + t.amount, 0);
+      .reduce((s, t) => s + signedAmount(t), 0);
     return { Category: CATEGORIES[cat].label, Total: total, Formatted: formatCurrency(total) };
   });
 
   const income = summaryData.find((s) => s.Category === 'Income')?.Total || 0;
   const totalExpenses = summaryData
-    .filter((s) => s.Category !== 'Income' && s.Category !== 'Transfer')
+    .filter((s) => !['Income', 'Transfer', 'Receivables'].includes(s.Category))
     .reduce((s, item) => s + item.Total, 0);
 
   summaryData.push(

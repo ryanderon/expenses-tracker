@@ -6,7 +6,7 @@ import {
   NavLink,
   useLocation,
 } from "react-router-dom";
-import { useState, useRef, lazy, Suspense } from "react";
+import { useState, useRef, useLayoutEffect, lazy, Suspense } from "react";
 import {
   TooltipProvider,
   Tooltip,
@@ -55,6 +55,30 @@ const Portfolio = lazy(() => import("@/pages/Portfolio"));
 const Insights = lazy(() => import("@/pages/Insights"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
 
+/**
+ * Publishes an element's rendered height as a CSS variable on <html>, so a
+ * page that has to fit the viewport exactly (the Insights chat) can subtract
+ * the app bar and bottom nav without hard-coding their sizes. A hidden element
+ * measures 0, which is what the desktop layout wants for the bottom nav.
+ */
+function useHeightVar(name) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const root = document.documentElement;
+    const update = () => root.style.setProperty(name, `${el.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty(name);
+    };
+  }, [name]);
+  return ref;
+}
+
 function RouteFallback() {
   return (
     <div className="flex items-center justify-center py-24">
@@ -68,7 +92,7 @@ function SidebarNav({ onNavigate }) {
   const { pathname } = useLocation();
 
   return (
-    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3">
+    <nav data-tour="nav-sidebar" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3">
       {NAV_ITEMS.map(({ to, labelKey, icon }) => {
         const active = pathname === to;
         return (
@@ -318,9 +342,10 @@ function MobileBottomNav({ onOpenMenu }) {
   const t = useT();
   const { pathname } = useLocation();
   const inBar = MOBILE_NAV.some((i) => i.to === pathname);
+  const ref = useHeightVar("--bottom-nav-h");
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
+    <nav ref={ref} className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
       <div className="flex justify-around">
         {MOBILE_NAV.map(({ to, labelKey, icon }) => (
           <NavLink
@@ -338,6 +363,7 @@ function MobileBottomNav({ onOpenMenu }) {
           </NavLink>
         ))}
         <button
+          data-tour="nav-more"
           onClick={onOpenMenu}
           className={cn(
             "flex flex-col items-center px-2 py-2.5 transition-colors",
@@ -359,13 +385,14 @@ function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const current = NAV_ITEMS.find((i) => i.to === pathname);
+  const headerRef = useHeightVar("--app-header-h");
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <DesktopSidebar onEditName={() => setEditNameOpen(true)} />
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-4 py-3 lg:px-8">
+        <header ref={headerRef} className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-4 py-3 lg:px-8">
           <div className="flex items-center gap-3">
             <MobileSidebar onEditName={() => setEditNameOpen(true)} />
             <span className="text-[15px] font-bold">
@@ -375,7 +402,9 @@ function AppShell() {
           <HeaderActions />
         </header>
 
-        <main className="flex-1 px-4 pb-24 pt-6 lg:px-8 lg:pb-16 lg:pt-7">
+        {/* A page that sizes itself to the viewport (data-chat-fill) already
+            leaves room for the bottom nav, so the scroll padding goes. */}
+        <main className="flex-1 px-4 pb-24 pt-6 lg:px-8 lg:pb-16 lg:pt-7 has-[[data-chat-fill]]:pb-0">
           <div className="mx-auto w-full max-w-[1240px]">
             <Suspense fallback={<RouteFallback />}>
               <Routes>

@@ -8,12 +8,13 @@ A personal finance tracker I built for myself to keep tabs on where my money goe
 - **Today** — Daily allowance: what's left to spend today, and what you've spent against it
 - **Transactions** — Every entry, searchable and filterable, with add/edit in one modal
 - **AI Insights** — Ask Claude about your spending; it reads a summary of your actual numbers
-- **Analytics** — Category distribution, expense breakdown, month-over-month comparison, category mix, quick stats
+- **Analytics** — Category distribution, expense breakdown, month-over-month comparison, category mix, quick stats, for a budget period, a custom date range, or a whole year
 - **Budget** — Recurring monthly limits with per-month overrides, subcategory limits, multi-month rollover, and pacing (see below)
-- **Reports** — Grouped summary table, a financial-health score with rate meters, and account usage
-- **Investments** — Track holdings by lot and see what they're worth now, with delayed prices from Twelve Data
+- **Reports** — Grouped summary table, a financial-health score with rate meters, and account usage, for a budget period, a custom date range, or a whole year, with Excel export
+- **Investments** — Track holdings by lot and see what they're worth now, with delayed prices (Yahoo for IDX and other major exchanges, Twelve Data for the rest)
 - **Accounts · Categories · Split Bill · Settings**
 - **Transfers** — Move money between accounts (e.g. salary → savings) without it counting as income or expense
+- **Receivables (Piutang)** — Money paid out for work to be reimbursed, or lent to someone. Logged as "paid out" and later "paid back" (partial repayments are fine), never counted as spending or income. What's still owed shows on Accounts and counts toward net worth
 - **Backup/Restore** — Auto-backup to your own Google Drive, plus JSON export/import
 - **Bilingual** — English by default, Bahasa Indonesia available
 - **PWA** — Installable on mobile, works offline
@@ -71,11 +72,13 @@ If no budget is set, the screen says so and points at the Budget page rather tha
 
 ## AI Insights
 
-Bring your own [Anthropic API key](https://console.anthropic.com/settings/keys) — add it in **Settings**. Requests go straight from your browser to Anthropic; the key is stored only on your device and is deliberately excluded from every backup and export.
+Bring your own API key — add it in **Settings**. Google AI Studio (Gemini) and Groq (Llama) have free tiers; Anthropic (Claude Haiku 5.5 and Claude Sonnet 5.5) is paid. Requests go straight from your browser to the provider; keys are stored only on your device and are deliberately excluded from every backup and export.
 
-Instead of shipping raw transactions, the app builds a compact JSON snapshot — monthly trend, category and subcategory breakdowns, budget vs actual, pacing, account balances, detected recurring commitments, and the largest transactions. That keeps a question at roughly 1–2k input tokens even with thousands of transactions.
+The first question in a chat carries a JSON snapshot: monthly trend, category and subcategory breakdowns, budget vs actual, pacing, daily spending, account balances, detected recurring commitments, and the period's transactions one compact line each (capped per model, keeping the largest when a month is busier than the cap). Follow-ups reuse it, and on Claude it is prompt-cached.
 
-Model and reasoning effort are configurable (Opus 5 by default, Sonnet 5 and Haiku 4.5 available).
+The assistant only talks about your own finances in Penny. It declines anything else (code, general knowledge, jokes, attempts to change its rules) and offers questions about your data instead. It won't pick stocks or funds, predict prices, or rule on tax. When the data doesn't cover a question, it says so instead of guessing.
+
+Claude runs with adaptive thinking at medium effort by default (changeable in Settings). Sonnet 5.5 requests opt into server-side fallback, so a safety decline is retried on Claude Sonnet 5 instead of failing.
 
 ## Investments
 
@@ -88,10 +91,10 @@ BBCA · 15 lots · avg Rp 5.843    cost Rp 8.765.000
 
 IDX lots are handled properly — 1 lot = 100 shares — and buying more of the same ticker averages into the existing position rather than creating a second row. Fees count toward cost basis, so the average price is your real break-even.
 
-Prices come from [Twelve Data](https://twelvedata.com/pricing) with your own API key, added in **Settings**. Notes on how it behaves:
+Prices for IDX and the other exchanges Yahoo covers (LSE, TSX, ASX, SGX, XETRA, NSE, BSE, JPX, KRX) come through a small Yahoo proxy in `api/quote.js`. No key is needed, so an IDX-only portfolio works out of the box. Everything else comes from [Twelve Data](https://twelvedata.com/pricing) with your own API key, added in **Settings**. Notes on how it behaves:
 
 - **Ticker search costs nothing.** It uses Twelve Data's reference endpoint, which needs no key and burns no credits — so you can browse freely. The exchange is always shown, because `BBCA` is Bank Central Asia on IDX *and* a Canadian ETF on three other exchanges.
-- **Quotes are rationed.** Automatic refreshes run at most **4× a day, at least 6 hours apart**. A portfolio's value doesn't move enough between those points to justify more, and the cache survives reloads — opening the app ten times in an afternoon costs nothing. Manual refresh is always available.
+- **Twelve Data quotes are rationed.** Automatic refreshes run at most **4× a day, at least 6 hours apart**. A portfolio's value doesn't move enough between those points to justify more, and the cache survives reloads — opening the app ten times in an afternoon costs nothing. Manual refresh is always available.
 - **Partial data is shown as partial.** A holding without a quote is counted at cost, and the total says so ("only 1 of 2 priced") rather than quietly under-reporting.
 - **Mixed currencies** pull one FX rate per foreign currency per refresh. A holding with no rate is left out of the combined total and flagged, rather than converted at a made-up rate.
 
@@ -129,9 +132,9 @@ Tone across both languages is casual and everyday — short sentences, contracti
 - React 19 + Vite 8
 - Tailwind CSS v4 + shadcn/ui
 - Zustand (state persisted to IndexedDB)
-- Recharts for charts (lazy-loaded with Reports)
+- Recharts for the Dashboard trend chart (lazy-loaded)
 - `@anthropic-ai/sdk` for Insights (lazy-loaded)
-- Twelve Data REST for stock prices (no SDK, plain `fetch`)
+- Yahoo (via the `api/quote.js` proxy) and Twelve Data REST for stock prices (no SDK, plain `fetch`)
 - date-fns, xlsx
 - i18n is hand-rolled — see `src/lib/i18n.js`
 
