@@ -55,6 +55,37 @@
   }
 }
 
+::view-transition-old(root),
+::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  animation: none;
+}
+
+::view-transition-new(root) {
+  mask: url('/theme-cat.gif') center / 0 no-repeat;
+  animation: theme-cat 1.6s both;
+}
+
+@keyframes theme-cat {
+  0% {
+    mask-size: 0;
+    animation-timing-function: var(--ease-fluid);
+  }
+  15% {
+    mask-size: 75vmin;
+  }
+  80% {
+    mask-size: 75vmin;
+    animation-timing-function: cubic-bezier(0.7, 0, 0.84, 0);
+  }
+  100% {
+    mask-size: 2500vmax;
+  }
+}
+
 @theme {
   /* Stone — warm neutral base */
   --color-stone-50: #faf8f5;

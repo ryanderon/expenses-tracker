@@ -40,7 +40,7 @@ import UserNameModal from "@/components/UserNameModal";
 import { BackupProvider } from "@/components/BackupProvider";
 import { useBackup } from "@/hooks/useGoogleBackup";
 import { useT } from "@/hooks/useT";
-import useTheme from "@/hooks/useTheme";
+import useTheme, { preloadThemeMask } from "@/hooks/useTheme";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import MotionProvider from "@/components/MotionProvider";
 import { EASE_FLUID, SPRING, SPRING_SNAPPY } from "@/lib/motion";
@@ -365,6 +365,9 @@ function HeaderActions() {
 
       <button
         onClick={toggleTheme}
+        onPointerEnter={preloadThemeMask}
+        onPointerDown={preloadThemeMask}
+        onFocus={preloadThemeMask}
         aria-label={t("app.toggleTheme")}
         className="press flex size-9 items-center justify-center overflow-hidden rounded-[10px] border border-border bg-card text-foreground hover:text-primary"
       >
