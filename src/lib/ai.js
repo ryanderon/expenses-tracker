@@ -54,7 +54,7 @@ How to answer:
 The answer is read in a narrow chat window on a phone, so format for that:
 - Short paragraphs and "-" bullets. Bold the key numbers.
 - Use a "## " heading only when the answer has several distinct parts.
-- For rankings, use a numbered list such as "1. **Rp 2.068.087** — Other (Expenses), 13 Nov, Jenius".
+- For rankings, use a numbered list such as "1. **Rp 1.250.000** — Other (Expenses), 3 Mar, Main account".
 - Use a markdown table only for a small comparison of at most three or four short columns; otherwise use bullets.
 
 You are analysing, not lecturing. Skip moralising about spending choices.`;

@@ -90,8 +90,8 @@ Claude runs with adaptive thinking at medium effort by default (changeable in Se
 Expenses answer "where did it go". Holdings answer "what do I actually have". They're separate on purpose: a transaction records that Rp 6.000.000 left your account, a holding records that it became **10 lots of BBCA at 6.000**.
 
 ```
-BBCA · 15 lots · avg Rp 5.843    cost Rp 8.765.000
-                                 now  Rp 10.725.000   +22,36%
+BBCA · 10 lots · avg Rp 6.000    cost Rp 6.000.000
+                                 now  Rp 6.750.000    +12,50%
 ```
 
 IDX lots are handled properly — 1 lot = 100 shares — and buying more of the same ticker averages into the existing position rather than creating a second row. Fees count toward cost basis, so the average price is your real break-even.
@@ -172,3 +172,11 @@ Everything is stored in this browser's **IndexedDB** under the database `penny`,
 Older installs kept data in localStorage, which caps out around 5MB and blocks the main thread on every read. Data written by those builds is migrated to IndexedDB automatically on first load, and the localStorage copy is removed once the move succeeds. If IndexedDB is unavailable (some private-browsing modes), the app falls back to localStorage rather than failing.
 
 Because browser storage can still be cleared, connect Google Drive backup or export a JSON backup periodically.
+
+## License
+
+© 2026 ryanderon. All rights reserved.
+
+The source is public for learning. You're welcome to read it, fork it on GitHub, and run your fork locally to study how it works.
+
+It is not licensed for reuse: using this code, in whole or in part, in another project, product or deployed app, or redistributing it, needs written permission.
