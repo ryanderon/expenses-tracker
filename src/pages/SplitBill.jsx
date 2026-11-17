@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
+import { AnimatePresence, m } from 'motion/react';
 import {
   Camera, Plus, Trash2, Users, Receipt, ScanLine, Loader2,
   Share2, X, UserPlus, ImagePlus, RotateCcw,
@@ -20,6 +21,7 @@ import { useT } from '@/hooks/useT';
 import PageHeader from '@/components/PageHeader';
 import { SegmentedTabs } from '@/components/ui/design';
 import { formatCurrency, cn } from '@/lib/utils';
+import { EXIT, POP, SPRING } from '@/lib/motion';
 
 const PERSON_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
@@ -406,13 +408,25 @@ export default function SplitBill() {
               <UserPlus className="size-3.5 mr-1" /> {t('splitBill.addPerson')}
             </Button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {people.map((p) => (
-              <div key={p.id} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-secondary/50 border border-border/50">
-                <PersonAvatar person={p} size="sm" showRemove={people.length > 1} onRemove={() => removePerson(p.id)} />
-                <span className="text-xs font-medium">{p.name}</span>
-              </div>
-            ))}
+          {/* People pop in and out; the chips after them slide over. */}
+          <div className="relative flex flex-wrap gap-2">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {people.map((p) => (
+                <m.div
+                  key={p.id}
+                  layout
+                  variants={POP}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  style={{ borderRadius: 999 }}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-secondary/50 border border-border/50"
+                >
+                  <PersonAvatar person={p} size="sm" showRemove={people.length > 1} onRemove={() => removePerson(p.id)} />
+                  <span className="text-xs font-medium">{p.name}</span>
+                </m.div>
+              ))}
+            </AnimatePresence>
           </div>
         </CardContent>
       </Card>
@@ -443,18 +457,28 @@ export default function SplitBill() {
           </div>
 
           {items.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              {items.map((item, i) => (
-                <BillItemCard
-                  key={item.id}
-                  item={item}
-                  index={i}
-                  people={people}
-                  onUpdate={(updates) => updateItem(item.id, updates)}
-                  onDelete={() => deleteItem(item.id)}
-                  onTogglePerson={(personId) => togglePersonOnItem(item.id, personId)}
-                />
-              ))}
+            <div className="relative flex flex-col gap-3">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {items.map((item, i) => (
+                  <m.div
+                    key={item.id}
+                    layout="position"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.97, transition: EXIT }}
+                    transition={SPRING}
+                  >
+                    <BillItemCard
+                      item={item}
+                      index={i}
+                      people={people}
+                      onUpdate={(updates) => updateItem(item.id, updates)}
+                      onDelete={() => deleteItem(item.id)}
+                      onTogglePerson={(personId) => togglePersonOnItem(item.id, personId)}
+                    />
+                  </m.div>
+                ))}
+              </AnimatePresence>
             </div>
           ) : (
             <div className="flex flex-col items-center py-8 text-center">

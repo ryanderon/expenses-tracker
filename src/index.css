@@ -4,6 +4,57 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Motion curves (see src/lib/motion.js for the JS side).
+ * fluid: strong ease-out for things appearing. glide: ease-in-out for things
+ * moving while on screen. drawer: the iOS sheet curve.
+ */
+@theme {
+  --ease-fluid: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-glide: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/*
+ * Press feedback for buttons that aren't the shared <Button>: a 3% squeeze,
+ * felt more than seen. Use instead of `transition-colors`, which it includes.
+ */
+@utility press {
+  transition-property: color, background-color, border-color, opacity, box-shadow, scale;
+  transition-timing-function: var(--ease-fluid);
+  transition-duration: 160ms;
+  &:active:not(:disabled) {
+    scale: 0.97;
+  }
+}
+
+/* Lets a conic-gradient ring fill smoothly when its value changes. */
+@property --ring-pct {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+@utility ring-fill {
+  transition: --ring-pct 700ms var(--ease-fluid);
+}
+
+/*
+ * Reduced motion: overlays and menus keep their fade but lose the slide and
+ * zoom; Motion does the same for its own animations (MotionConfig).
+ */
+@media (prefers-reduced-motion: reduce) {
+  /* !important: the animation classes set these on the element itself. */
+  *, ::before, ::after {
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-exit-scale: 1 !important;
+  }
+}
+
 @theme {
   /* Stone — warm neutral base */
   --color-stone-50: #faf8f5;

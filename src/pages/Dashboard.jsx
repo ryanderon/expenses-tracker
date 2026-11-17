@@ -23,6 +23,7 @@ import {
 } from '@/lib/utils';
 
 import QuickAdd from '@/components/QuickAdd';
+import { AnimatedNumber } from '@/components/ui/motion';
 
 export default function Dashboard() {
   const t = useT();
@@ -138,17 +139,17 @@ export default function Dashboard() {
               {t('dashboard.netBalance')}
             </div>
             <div className="mt-1 text-[32px] font-extrabold tracking-[-0.02em] tabular-nums sm:text-[38px]">
-              {formatCurrency(totals.net)}
+              <AnimatedNumber value={totals.net} format={formatCurrency} />
             </div>
           </div>
           <div className="flex gap-6">
             <div>
               <div className="text-xs opacity-80">{t('transactions.income')}</div>
-              <div className="text-[17px] font-bold tabular-nums">{formatCurrency(totals.income)}</div>
+              <div className="text-[17px] font-bold tabular-nums"><AnimatedNumber value={totals.income} format={formatCurrency} /></div>
             </div>
             <div>
               <div className="text-xs opacity-80">{t('reports.outflow')}</div>
-              <div className="text-[17px] font-bold tabular-nums">{formatCurrency(outflow)}</div>
+              <div className="text-[17px] font-bold tabular-nums"><AnimatedNumber value={outflow} format={formatCurrency} /></div>
             </div>
           </div>
         </div>
@@ -156,19 +157,19 @@ export default function Dashboard() {
         {/* Stats */}
         <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
-            label={t('transactions.income')} value={formatCurrency(totals.income)}
+            label={t('transactions.income')} value={<AnimatedNumber value={totals.income} format={formatCurrency} />}
             icon="trending_up" tone="primary" valueClass="text-primary"
           />
           <StatCard
-            label={t('transactions.expenses')} value={formatCurrency(totals.expenses)}
+            label={t('transactions.expenses')} value={<AnimatedNumber value={totals.expenses} format={formatCurrency} />}
             icon="trending_down" tone="danger" valueClass="text-danger"
           />
           <StatCard
-            label={t('categoriesData.savings')} value={formatCurrency(totals.savings)}
+            label={t('categoriesData.savings')} value={<AnimatedNumber value={totals.savings} format={formatCurrency} />}
             icon="savings" tone="teal" valueClass="text-teal"
           />
           <StatCard
-            label={t('categoriesData.investments')} value={formatCurrency(totals.investments)}
+            label={t('categoriesData.investments')} value={<AnimatedNumber value={totals.investments} format={formatCurrency} />}
             icon="account_balance" tone="violet" valueClass="text-violet"
           />
         </div>

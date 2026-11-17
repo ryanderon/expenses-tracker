@@ -25,10 +25,11 @@ export default defineConfig([
     rules: {
       // Component props destructured as `icon: Icon` are only referenced in
       // JSX, which core no-unused-vars can't see — same reasoning as
-      // varsIgnorePattern, applied to arguments.
+      // varsIgnorePattern, applied to arguments. `m` is Motion's element
+      // namespace (`<m.div>`), likewise only used in JSX.
       'no-unused-vars': [
         'error',
-        { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' },
+        { varsIgnorePattern: '^([A-Z_]|m$)', argsIgnorePattern: '^[A-Z_]' },
       ],
       'react/prop-types': 'off',
     },

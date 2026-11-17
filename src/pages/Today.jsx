@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { AnimatePresence, m } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Plus, ArrowRight, Target } from 'lucide-react';
@@ -13,6 +14,8 @@ import { formatCurrency, getMonthKey, cn } from '@/lib/utils';
 import { buildBudgetReport, getDailyAllowance } from '@/lib/budget';
 import QuickAdd from '@/components/QuickAdd';
 import PageHeader from '@/components/PageHeader';
+import { AnimatedNumber } from '@/components/ui/motion';
+import { EASE_FLUID, LIST_ITEM } from '@/lib/motion';
 
 /**
  * The number you came for, drawn as a ring.
@@ -27,8 +30,6 @@ function ringTextSize(amount) {
 
 function AllowanceRing({ pct, tone, children }) {
   const radius = 86;
-  const circumference = 2 * Math.PI * radius;
-  const dash = (Math.min(pct, 100) / 100) * circumference;
 
   return (
     <div className="relative mx-auto size-56 sm:size-64">
@@ -37,11 +38,13 @@ function AllowanceRing({ pct, tone, children }) {
           cx="100" cy="100" r={radius}
           fill="none" stroke="var(--secondary)" strokeWidth="6"
         />
-        <circle
+        {/* Sweeps round to the day's share when the page opens, and to any new value after. */}
+        <m.circle
           cx="100" cy="100" r={radius}
           fill="none" stroke={tone} strokeWidth="6" strokeLinecap="round"
-          strokeDasharray={`${dash} ${circumference}`}
-          className="transition-[stroke-dasharray] duration-700 ease-out"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: Math.min(Math.max(pct, 0), 100) / 100 }}
+          transition={{ duration: 0.8, ease: EASE_FLUID }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
@@ -195,7 +198,7 @@ export default function Today() {
                 {t('today.periodOver')}
               </p>
               <p className={cn('font-bold tabular-nums leading-tight text-destructive', ringTextSize(-spending.remaining))}>
-                {formatCurrency(-spending.remaining)}
+                <AnimatedNumber value={-spending.remaining} format={formatCurrency} />
               </p>
             </AllowanceRing>
           ) : (
@@ -207,7 +210,7 @@ export default function Today() {
                 className={cn('font-bold tabular-nums leading-tight', ringTextSize(daily.left))}
                 style={{ color: daily.left >= 0 ? undefined : 'var(--destructive)' }}
               >
-                {formatCurrency(Math.abs(daily.left))}
+                <AnimatedNumber value={Math.abs(daily.left)} format={formatCurrency} />
               </p>
             </AllowanceRing>
           )}
@@ -321,23 +324,34 @@ export default function Today() {
           <h3 className="text-sm font-semibold">{t('today.spentToday')}</h3>
           {daily.spentToday > 0 && (
             <p className="text-sm font-semibold tabular-nums">
-              {formatCurrency(daily.spentToday)}
+              <AnimatedNumber value={daily.spentToday} format={formatCurrency} />
             </p>
           )}
         </div>
 
-        {todayEntries.length > 0 ? (
-          <div className="divide-y divide-border/60">
-            {todayEntries.map((tx) => (
-              <EntryRow
-                key={tx.id} tx={tx} allCategories={allCategories}
-                accounts={accounts} t={t} dates={dates}
-              />
-            ))}
-          </div>
-        ) : (
+        {todayEntries.length === 0 && (
           <p className="text-sm text-muted-foreground py-2">{t('today.noSpendToday')}</p>
         )}
+        {/* Always mounted, so even the day's first entry animates in. */}
+        <div className="divide-y divide-border/60">
+          <AnimatePresence initial={false}>
+            {todayEntries.map((tx) => (
+              <m.div
+                key={tx.id}
+                variants={LIST_ITEM}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="overflow-hidden"
+              >
+                <EntryRow
+                  tx={tx} allCategories={allCategories}
+                  accounts={accounts} t={t} dates={dates}
+                />
+              </m.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Recent */}
@@ -355,12 +369,23 @@ export default function Today() {
               </Link>
             </div>
             <div className="divide-y divide-border/60">
-              {recentEntries.map((tx) => (
-                <EntryRow
-                  key={tx.id} tx={tx} allCategories={allCategories}
-                  accounts={accounts} t={t} dates={dates}
-                />
-              ))}
+              <AnimatePresence initial={false}>
+                {recentEntries.map((tx) => (
+                  <m.div
+                    key={tx.id}
+                    variants={LIST_ITEM}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    className="overflow-hidden"
+                  >
+                    <EntryRow
+                      tx={tx} allCategories={allCategories}
+                      accounts={accounts} t={t} dates={dates}
+                    />
+                  </m.div>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
         </>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { AnimatePresence, m } from 'motion/react';
 import {
   Panel, Icon, SoftBadge, IconBadge,
 } from '@/components/ui/design';
@@ -16,6 +17,7 @@ import {
   getAllCategoryList, getSubcategories, isReceivableReturn,
 } from '@/lib/constants';
 import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
+import { LIST_ITEM } from '@/lib/motion';
 import { formatCurrency, getMonthKey, filterTransactionsByDateRange, cn } from '@/lib/utils';
 
 /** Dropdown filter matching the design: pill button + light popover list. */
@@ -196,6 +198,7 @@ export default function Transactions() {
     }
     return [...list].sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [periodTx, catFilter, subFilter, accFilter, search]);
+  const listKey = JSON.stringify([period, catFilter, subFilter, accFilter, search.trim()]);
 
   const income = filtered
     .filter((x) => allCategories[x.category]?.type === 'income')
@@ -289,22 +292,34 @@ export default function Transactions() {
         </div>
 
         <Panel data-tour="transaction-list" padded={false} className="p-2">
-          {filtered.length > 0 ? (
-            <div className="flex flex-col">
+          {/* Keyed by the filters: changing a filter swaps the list at once,
+              while adding or deleting a row inside it animates that row. It
+              stays mounted when empty, so the last row can still animate out. */}
+          <div key={listKey} className="flex flex-col">
+            <AnimatePresence initial={false}>
               {filtered.map((tx) => (
-                <TransactionRow
+                <m.div
                   key={tx.id}
-                  tx={tx}
-                  allCategories={allCategories}
-                  accounts={accounts}
-                  t={t}
-                  dates={dates}
-                  onEdit={(x) => { setEditing(x); setAddOpen(true); }}
-                  onDelete={deleteTransaction}
-                />
+                  variants={LIST_ITEM}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="overflow-hidden"
+                >
+                  <TransactionRow
+                    tx={tx}
+                    allCategories={allCategories}
+                    accounts={accounts}
+                    t={t}
+                    dates={dates}
+                    onEdit={(x) => { setEditing(x); setAddOpen(true); }}
+                    onDelete={deleteTransaction}
+                  />
+                </m.div>
               ))}
-            </div>
-          ) : (
+            </AnimatePresence>
+          </div>
+          {filtered.length === 0 && (
             <div className="px-4 py-12 text-center text-[13.5px] text-muted-foreground">
               {isFiltered ? t('transactions.emptyFiltered') : t('transactions.emptyBody')}
             </div>

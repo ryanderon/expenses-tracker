@@ -28,9 +28,14 @@ The UI follows `Penny redesign project/Penny Redesign.dc.html` — the design do
 - **Surfaces** are 20px-radius cards on a hairline border with a soft two-layer shadow. shadcn's `Card` was retuned to match, so pages that don't use the design primitives still land in the same language.
 - **Repeated shapes** live in [src/components/ui/design.jsx](src/components/ui/design.jsx) — `Panel`, `StatCard`, `IconBadge`, `StackedBar`, `LegendRow`, `Meter`, `Ring`, `SegmentedTabs`, `ChoicePill`, `InitialBadge`. Adjust a radius there and it lands everywhere.
 - **Dates** use [src/components/ui/date-fields.jsx](src/components/ui/date-fields.jsx) — `MonthField` (pill + month/year grid) and `DateField` (pill + calendar popover). Native `<input type="month">` and `type="date"` render an OS widget that ignores every token in the design, so nothing uses them. Every period control in the app is the same pill; every tab strip is `SegmentedTabs`.
+- **Motion** uses Motion for React (`motion/react`), with one shared language in [src/lib/motion.js](src/lib/motion.js): no-bounce springs for things that change state, a strong ease-out for things appearing, and the iOS sheet curve for drawers.
+  - Highlights slide instead of blinking: tab strips, pill rows in the add-transaction form, the sidebar and the bottom bar all share one indicator that moves (`layoutId`).
+  - Dialogs spring in and out. The phone's side menu slides fully and can be dragged closed, with the dimmed page following your finger.
+  - Sections open in place, list rows grow in and collapse out, and key amounts glide to their new value when the period changes. Searching or filtering never animates, so typing stays instant.
+  - "Reduce motion" in the OS turns movement into plain fades.
 - **Amounts** use [src/components/ui/currency-input.jsx](src/components/ui/currency-input.jsx) in `sm`/`md`/`lg`. The `Rp` prefix is a flex sibling of the input, not an overlay — an absolutely positioned prefix has to be dodged with left padding, which lines up at exactly one font size and drifts at every other.
 
-Navigation is the design's twelve-item sidebar. Two entries post-date the design — **Today** and **Investments** — and are slotted beside their nearest relatives. The design is desktop-only, so phones additionally get a bottom bar (Dashboard · Transactions · Budget · Insights) plus a menu button that opens the full sidebar.
+Navigation is the design's twelve-item sidebar. Two entries post-date the design — **Today** and **Investments** — and are slotted beside their nearest relatives. The design is desktop-only, so phones additionally get a bottom bar (Dashboard · Today · Transactions · Budget) plus a menu button that opens the full sidebar.
 
 Charts stay on Recharts, recoloured to the design palette; Recharts is lazy-loaded so it never blocks the dashboard's first paint.
 
@@ -131,11 +136,12 @@ Tone across both languages is casual and everyday — short sentences, contracti
 
 - React 19 + Vite 8
 - Tailwind CSS v4 + shadcn/ui
+- Motion (`motion/react`) for animation
 - Zustand (state persisted to IndexedDB)
 - Recharts for the Dashboard trend chart (lazy-loaded)
 - `@anthropic-ai/sdk` for Insights (lazy-loaded)
 - Yahoo (via the `api/quote.js` proxy) and Twelve Data REST for stock prices (no SDK, plain `fetch`)
-- date-fns, xlsx
+- date-fns, xlsx (loaded on the first Excel export, not with the app)
 - i18n is hand-rolled — see `src/lib/i18n.js`
 
 ## Getting started

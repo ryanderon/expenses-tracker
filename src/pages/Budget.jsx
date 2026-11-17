@@ -32,6 +32,7 @@ import { StatCard, SegmentedTabs, Icon } from '@/components/ui/design';
 import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
 import { buildBudgetReport, shiftMonth } from '@/lib/budget';
 import PageHeader from '@/components/PageHeader';
+import { AnimatedNumber, Collapse } from '@/components/ui/motion';
 
 /** Choices for when a category counts as nearly used up (`budgetSettings.alertThreshold`). */
 const ALERT_THRESHOLDS = [50, 70, 80, 90, 100];
@@ -174,7 +175,7 @@ function CategoryCard({ cat, monthKey, expanded, onToggleExpand }) {
             className="h-8 shrink-0"
             onClick={() => onToggleExpand(cat.key)}
           >
-            <ChevronDown className={cn('transition-transform', expanded && 'rotate-180')} />
+            <ChevronDown className={cn('transition-transform duration-300 ease-fluid', expanded && 'rotate-180')} />
             <span className="hidden sm:inline">{t('budget.details')}</span>
           </Button>
         </div>
@@ -230,8 +231,7 @@ function CategoryCard({ cat, monthKey, expanded, onToggleExpand }) {
           )}
         </div>
 
-        {expanded && (
-          <div className="mt-4 pt-4 border-t border-border flex flex-col gap-3">
+        <Collapse show={expanded} innerClassName="mt-4 pt-4 border-t border-border flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <Label className="text-xs text-muted-foreground">{t('budget.subcategoryLimits')}</Label>
               <Button
@@ -282,8 +282,7 @@ function CategoryCard({ cat, monthKey, expanded, onToggleExpand }) {
                 </div>
               ))
             )}
-          </div>
-        )}
+        </Collapse>
       </CardContent>
     </Card>
   );
@@ -637,14 +636,14 @@ export default function Budget() {
           <div data-tour="budget-summary" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               label={t('budget.income')}
-              value={formatCurrency(report.income)}
+              value={<AnimatedNumber value={report.income} format={formatCurrency} />}
               icon="trending_up"
               tone="primary"
               valueClass="text-primary"
             />
             <StatCard
               label={t('budget.spendLimit')}
-              value={formatCurrency(spending.budget)}
+              value={<AnimatedNumber value={spending.budget} format={formatCurrency} />}
               icon="track_changes"
               sub={
                 <div className="flex flex-col gap-0.5">
@@ -661,14 +660,14 @@ export default function Budget() {
             />
             <StatCard
               label={t('transactions.expenses')}
-              value={formatCurrency(spending.spent)}
+              value={<AnimatedNumber value={spending.spent} format={formatCurrency} />}
               icon="trending_down"
               tone={spending.isOver ? 'danger' : 'muted'}
               valueClass={spending.isOver ? 'text-danger' : undefined}
             />
             <StatCard
               label={t('budget.unallocated')}
-              value={formatCurrency(report.unallocated)}
+              value={<AnimatedNumber value={report.unallocated} format={formatCurrency} />}
               icon="account_balance_wallet"
               tone={report.unallocated < 0 ? 'danger' : 'muted'}
               valueClass={report.unallocated < 0 ? 'text-danger' : undefined}
@@ -690,7 +689,7 @@ export default function Budget() {
                     <h3 className="text-sm font-semibold">{t('budget.spendingTitle')}</h3>
                   </div>
                   <p className="text-2xl font-bold">
-                    {formatCurrency(spending.spent)}{' '}
+                    <AnimatedNumber value={spending.spent} format={formatCurrency} />{' '}
                     {spending.budget > 0 && (
                       <span className="text-sm font-normal text-muted-foreground">
                         {t('common.of')} {formatCurrency(spending.budget)}
@@ -705,7 +704,7 @@ export default function Budget() {
                 {spending.budget > 0 && (
                   <div className="text-right shrink-0">
                     <p className={cn('text-3xl font-bold', spending.isOver ? 'text-destructive' : 'text-chart-1')}>
-                      {spending.pctRaw}%
+                      <AnimatedNumber value={spending.pctRaw} format={(v) => `${v}%`} />
                     </p>
                     <p className="text-xs text-muted-foreground">{t('budget.used')}</p>
                   </div>

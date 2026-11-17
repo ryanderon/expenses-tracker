@@ -26,6 +26,7 @@ import { PRICE_BUDGET } from '@/lib/prices';
 import { getStorageSize } from '@/lib/idbStorage';
 import { exportToExcel } from '@/lib/excel';
 import { cn, getMonthKey } from '@/lib/utils';
+import { Collapse } from '@/components/ui/motion';
 import { useT, useDateFormat } from '@/hooks/useT';
 import { usePeriodLabel } from '@/hooks/useCycle';
 import { LOCALE_OPTIONS } from '@/lib/i18n';
@@ -242,12 +243,14 @@ function AiKeyField({ provider }) {
         </Button>
       </div>
 
-      {result && (
-        <p className={cn('text-xs flex items-center gap-1', result.ok ? 'text-chart-1' : 'text-destructive')}>
-          {result.ok ? <Check className="size-3" /> : <X className="size-3" />}
-          {result.message}
-        </p>
-      )}
+      <Collapse show={!!result} className="-mt-2" innerClassName="pt-2">
+        {result && (
+          <p className={cn('text-xs flex items-center gap-1', result.ok ? 'text-chart-1' : 'text-destructive')}>
+            {result.ok ? <Check className="size-3" /> : <X className="size-3" />}
+            {result.message}
+          </p>
+        )}
+      </Collapse>
 
       <p className="text-xs text-muted-foreground flex items-start gap-1.5">
         <ShieldCheck className="size-3.5 mt-0.5 shrink-0 text-chart-1" />

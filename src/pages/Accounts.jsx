@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { AnimatePresence, m } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/design';
 import PageHeader from '@/components/PageHeader';
 import ReassignDialog from '@/components/ReassignDialog';
+import useExitable from '@/hooks/useExitable';
 import useStore from '@/store/useStore';
 import { useT, useDateFormat } from '@/hooks/useT';
 import usePortfolio from '@/hooks/usePortfolio';
@@ -20,6 +22,8 @@ import usePrices from '@/hooks/usePrices';
 import { ACCOUNT_COLORS, ACCOUNT_ROLES, accountRole, getAllCategories } from '@/lib/constants';
 import { formatCurrency, getAccountBalance, getReceivables, cn } from '@/lib/utils';
 import { subcategoryLabel } from '@/lib/i18n';
+import { SPRING, EXIT } from '@/lib/motion';
+import { AnimatedNumber } from '@/components/ui/motion';
 
 /** Share of `part` in `total`, or null when a negative balance makes it meaningless. */
 function share(part, total, parts) {
@@ -56,7 +60,7 @@ function NetWorthPanel({ cash, saved, investAccounts, portfolio, hasHoldings, ow
         'mt-1 text-[28px] font-extrabold tabular-nums tracking-[-0.02em]',
         total < 0 && 'text-danger'
       )}>
-        {formatCurrency(total)}
+        <AnimatedNumber value={total} format={formatCurrency} />
       </p>
 
       {segments.length > 1 && (
@@ -319,6 +323,10 @@ export default function Accounts() {
   // { id, name, count } for an account being deleted that still has transactions.
   const [deleting, setDeleting] = useState(null);
   const [fixingOrphans, setFixingOrphans] = useState(false);
+  // Stay mounted through their closing animation.
+  const formDialog = useExitable(dialogOpen);
+  const deleteDialog = useExitable(deleting);
+  const orphanDialog = useExitable(fixingOrphans);
 
   const holdings = useStore((s) => s.holdings);
   const portfolio = usePortfolio();
@@ -413,11 +421,21 @@ export default function Accounts() {
       )}
 
       {rows.length > 0 || hasHoldings ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="relative grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {/* A new account grows in, a deleted one shrinks away, and `layout`
+              slides the cards after it into the gap. Radius inline (px) so
+              the layout animation doesn't warp the corners. */}
+          <AnimatePresence mode="popLayout" initial={false}>
           {rows.map((acc) => (
-            <div
+            <m.div
               key={acc.id}
-              className="group relative rounded-[20px] border border-border bg-card p-5 shadow-[var(--shadow-card)]"
+              layout
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95, transition: EXIT }}
+              transition={SPRING}
+              style={{ borderRadius: 20 }}
+              className="group relative border border-border bg-card p-5 shadow-[var(--shadow-card)]"
             >
               <div className="mb-4 flex items-center gap-3">
                 <InitialBadge color={acc.color} size={48} radius={14}>
@@ -478,10 +496,20 @@ export default function Accounts() {
                   <TooltipContent>{t('common.delete')}</TooltipContent>
                 </Tooltip>
               </div>
-            </div>
+            </m.div>
           ))}
-          {hasHoldings && <InvestmentCard portfolio={portfolio} />}
-          {receivables.count > 0 && <ReceivablesCard receivables={receivables} />}
+          </AnimatePresence>
+          {/* These ride along when an account card before them comes or goes. */}
+          {hasHoldings && (
+            <m.div layout="position" transition={SPRING} className="grid">
+              <InvestmentCard portfolio={portfolio} />
+            </m.div>
+          )}
+          {receivables.count > 0 && (
+            <m.div layout="position" transition={SPRING} className="grid">
+              <ReceivablesCard receivables={receivables} />
+            </m.div>
+          )}
         </div>
       ) : (
         <EmptyState
@@ -489,38 +517,40 @@ export default function Accounts() {
           title={t('accounts.emptyTitle')}
           body={t('accounts.emptyBody')}
           action={
-            <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true); }}>
               <Icon name="add" size={18} /> {t('accounts.add')}
             </Button>
           }
         />
       )}
 
-      {dialogOpen && (
+      {formDialog.mounted && (
         <AccountFormDialog
           open={dialogOpen}
-          onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditing(null); }}
+          // `editing` is left as is on close so the title doesn't flip while
+          // the dialog animates out; every way of opening it sets it first.
+          onOpenChange={setDialogOpen}
           account={editing}
           onSubmit={handleSubmit}
         />
       )}
 
-      {deleting && (
+      {deleteDialog.mounted && (
         <ReassignDialog
-          open
+          open={deleteDialog.open}
           onOpenChange={(v) => { if (!v) setDeleting(null); }}
-          title={t('accounts.deleteTitle', { name: deleting.name })}
-          description={t('accounts.deleteHasTx', { count: deleting.count })}
-          count={deleting.count}
-          options={accountOptions(deleting.id)}
+          title={t('accounts.deleteTitle', { name: deleteDialog.value.name })}
+          description={t('accounts.deleteHasTx', { count: deleteDialog.value.count })}
+          count={deleteDialog.value.count}
+          options={accountOptions(deleteDialog.value.id)}
           confirmLabel={t('common.delete')}
-          onConfirm={(moveTo) => deleteAccount(deleting.id, { moveTo })}
+          onConfirm={(moveTo) => deleteAccount(deleteDialog.value.id, { moveTo })}
         />
       )}
 
-      {fixingOrphans && (
+      {orphanDialog.mounted && (
         <ReassignDialog
-          open
+          open={orphanDialog.open}
           onOpenChange={setFixingOrphans}
           title={t('accounts.orphanDialogTitle')}
           description={t('accounts.orphanBody')}

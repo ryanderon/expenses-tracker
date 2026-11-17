@@ -1,3 +1,6 @@
+import { createContext, useContext, useId } from 'react';
+import { m } from 'motion/react';
+import { SPRING, SPRING_SNAPPY } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
 /**
@@ -102,6 +105,7 @@ export function StackedBar({ segments, height = 14, className }) {
           .map((s) => (
             <div
               key={s.key ?? s.label}
+              className="transition-[width] duration-700 ease-fluid"
               style={{ width: `${(s.value / total) * 100}%`, background: s.color }}
             />
           ))}
@@ -134,7 +138,7 @@ export function Meter({ pct, color = 'var(--primary)', height = 7, className }) 
       style={{ height }}
     >
       <div
-        className="h-full rounded-full transition-[width] duration-500"
+        className="h-full rounded-full transition-[width] duration-700 ease-fluid"
         style={{
           width: `${Math.min(Math.max(pct, 0), 100)}%`,
           background: `linear-gradient(90deg, color-mix(in oklch, ${color} 70%, white), ${color})`,
@@ -144,16 +148,21 @@ export function Meter({ pct, color = 'var(--primary)', height = 7, className }) 
   );
 }
 
-/** Conic-gradient ring with a value in the middle (Allocation of Income). */
+/**
+ * Conic-gradient ring with a value in the middle (Allocation of Income).
+ * The fill is a registered CSS property (`--ring-pct`), so a new value sweeps
+ * round instead of jumping.
+ */
 export function Ring({ pct, color, label, size = 68 }) {
   const inner = Math.round(size * 0.765);
   return (
     <div
-      className="mx-auto flex items-center justify-center rounded-full"
+      className="ring-fill mx-auto flex items-center justify-center rounded-full"
       style={{
         width: size,
         height: size,
-        background: `conic-gradient(${color} ${Math.min(pct, 100)}%, var(--border) 0)`,
+        '--ring-pct': `${Math.min(Math.max(pct, 0), 100)}%`,
+        background: `conic-gradient(${color} var(--ring-pct), var(--border) 0)`,
       }}
     >
       <div
@@ -166,8 +175,17 @@ export function Ring({ pct, color, label, size = 68 }) {
   );
 }
 
-/** Pill tab strip — Budget's Monthly/Recurring, Reports' period switch. */
-export function SegmentedTabs({ value, onChange, options, className }) {
+/**
+ * Pill tab strip — Budget's Monthly/Recurring, Reports' period switch.
+ * One highlight slides between the tabs (a shared `layoutId`, scoped per
+ * strip by `useId`), so the eye follows the switch instead of seeing two
+ * pills blink.
+ */
+export function SegmentedTabs({ value, onChange, options, className, id }) {
+  const autoId = useId();
+  // A fixed `id` lets the highlight slide even when the strip is remounted
+  // in a different layout (Insights' two tabs render different pages).
+  const strip = id ?? autoId;
   return (
     <div
       className={cn(
@@ -181,15 +199,22 @@ export function SegmentedTabs({ value, onChange, options, className }) {
           <button
             key={o.value}
             type="button"
+            aria-pressed={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              'rounded-[9px] px-3 py-2 text-[12.5px] font-bold transition-colors',
-              active
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+              'press relative rounded-[9px] px-3 py-2 text-[12.5px] font-bold',
+              active ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            {o.label}
+            {active && (
+              <m.span
+                layoutId={`${strip}-tab`}
+                transition={SPRING}
+                className="absolute inset-0 bg-primary"
+                style={{ borderRadius: 9 }}
+              />
+            )}
+            <span className="relative flex items-center gap-[inherit]">{o.label}</span>
           </button>
         );
       })}
@@ -197,20 +222,52 @@ export function SegmentedTabs({ value, onChange, options, className }) {
   );
 }
 
-/** Selectable chip used in the Add Transaction modal (type / account). */
-export function ChoicePill({ active, children, ...props }) {
+const ChoiceGroupContext = createContext(null);
+
+/**
+ * A row of ChoicePills where one is picked. Inside a group the highlight
+ * slides from the old pill to the new one, like SegmentedTabs.
+ */
+export function ChoiceGroup({ children, className }) {
+  const group = useId();
+  return (
+    <ChoiceGroupContext.Provider value={group}>
+      <div className={cn('flex flex-wrap gap-1.5', className)}>{children}</div>
+    </ChoiceGroupContext.Provider>
+  );
+}
+
+/**
+ * Selectable chip used in the Add Transaction modal (type / account).
+ * `color` tints the active pill (a category's own colour).
+ */
+export function ChoicePill({ active, color, children, className, ...props }) {
+  const group = useContext(ChoiceGroupContext);
+  const fill = { borderRadius: 9, ...(color ? { backgroundColor: color } : {}) };
   return (
     <button
       type="button"
+      aria-pressed={active}
       className={cn(
-        'rounded-[9px] px-3 py-2 text-[12.5px] font-bold transition-colors',
+        'press relative rounded-[9px] bg-secondary px-3 py-2 text-[12.5px] font-bold',
         active
-          ? 'bg-primary text-primary-foreground'
-          : 'bg-secondary text-muted-foreground hover:text-foreground'
+          ? color ? 'text-white' : 'text-primary-foreground'
+          : 'text-muted-foreground hover:text-foreground',
+        className
       )}
       {...props}
     >
-      {children}
+      {active && (group ? (
+        <m.span
+          layoutId={`${group}-choice`}
+          transition={SPRING_SNAPPY}
+          className="absolute inset-0 bg-primary"
+          style={fill}
+        />
+      ) : (
+        <span className="absolute inset-0 bg-primary" style={fill} />
+      ))}
+      <span className="relative">{children}</span>
     </button>
   );
 }

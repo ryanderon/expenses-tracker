@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { CATEGORIES } from './constants';
 import { formatCurrency, formatDate } from './utils';
 
@@ -15,7 +14,13 @@ function exportType(t) {
   return 'Expense';
 }
 
-export function exportToExcel(transactions, accounts, filename = 'financial-report') {
+/**
+ * Builds and downloads the workbook. `xlsx` is the biggest library in the
+ * app and only this needs it, so it's fetched on the first export instead of
+ * with the first page load. Callers don't wait for it.
+ */
+export async function exportToExcel(transactions, accounts, filename = 'financial-report') {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
   const allData = transactions.map((t) => {

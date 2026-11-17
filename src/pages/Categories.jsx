@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { AnimatePresence, m } from 'motion/react';
 import { Plus, Pencil, Trash2, Tags, X, GripVertical } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,9 +20,11 @@ import {
   CATEGORIES, CATEGORY_TYPES, CATEGORY_COLORS, getAllCategories, getSubcategories, isNeutralType,
 } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { POP } from '@/lib/motion';
 import { Icon, SoftBadge } from '@/components/ui/design';
 import PageHeader from '@/components/PageHeader';
 import ReassignDialog from '@/components/ReassignDialog';
+import useExitable from '@/hooks/useExitable';
 import { useT } from '@/hooks/useT';
 import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
 
@@ -155,10 +158,22 @@ function resolveSubName(typed, existing, t) {
 }
 
 /** A subcategory the user made: tap the name to rename it, × to remove it. */
-function CustomSubChip({ name, onRename, onRemove }) {
+/**
+ * A user-made subcategory. It pops in when added and out when removed, and
+ * `layout` lets the chips after it slide over instead of jumping.
+ */
+function CustomSubChip({ name, onRename, onRemove, ref }) {
   const t = useT();
   return (
-    <span className="flex items-center gap-1 rounded-full border border-dashed border-border py-1 pl-2.5 pr-2 text-[11.5px] text-muted-foreground">
+    <m.span
+      ref={ref}
+      layout
+      variants={POP}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="flex items-center gap-1 rounded-full border border-dashed border-border py-1 pl-2.5 pr-2 text-[11.5px] text-muted-foreground"
+    >
       <button
         type="button"
         onClick={onRename}
@@ -176,7 +191,7 @@ function CustomSubChip({ name, onRename, onRemove }) {
       >
         <Icon name="close" size={13} />
       </button>
-    </span>
+    </m.span>
   );
 }
 
@@ -184,7 +199,7 @@ function CustomSubChip({ name, onRename, onRemove }) {
  * Renames a user-made subcategory. Its transactions and budget limits follow
  * the new name; picking a name the category already has merges the two.
  */
-function RenameSubDialog({ category, from, count, existing, onClose, onConfirm }) {
+function RenameSubDialog({ open = true, category, from, count, existing, onClose, onConfirm }) {
   const t = useT();
   const [value, setValue] = useState(from);
   const name = resolveSubName(value, existing, t);
@@ -198,7 +213,7 @@ function RenameSubDialog({ category, from, count, existing, onClose, onConfirm }
   };
 
   return (
-    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t('categories.renameSubTitle')}</DialogTitle>
@@ -266,23 +281,28 @@ function CategoryCard({ category, isBuiltIn, customSubs, onAddSub, onRemoveSub, 
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{t('categories.subcategories')}</p>
 
           {isBuiltIn && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="relative flex flex-wrap gap-1.5">
               {defaultSubs.map((sub) => (
                 <span key={sub} className="rounded-full border border-border bg-background px-2.5 py-1 text-[11.5px] text-muted-foreground">
                   {subcategoryLabel(sub, t)}
                 </span>
               ))}
-              {customSubs.map((sub) => (
-                <CustomSubChip key={sub} name={sub} onRename={() => onRenameSub(sub)} onRemove={() => onRemoveSub(sub)} />
-              ))}
+              <AnimatePresence mode="popLayout" initial={false}>
+                {customSubs.map((sub) => (
+                  <CustomSubChip key={sub} name={sub} onRename={() => onRenameSub(sub)} onRemove={() => onRemoveSub(sub)} />
+                ))}
+              </AnimatePresence>
             </div>
           )}
 
           {!isBuiltIn && (
-            <div className="flex flex-wrap gap-1.5">
-              {defaultSubs.length > 0 ? defaultSubs.map((sub) => (
-                <CustomSubChip key={sub} name={sub} onRename={() => onRenameSub(sub)} onRemove={() => onRemoveSub(sub)} />
-              )) : (
+            <div className="relative flex flex-wrap gap-1.5">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {defaultSubs.map((sub) => (
+                  <CustomSubChip key={sub} name={sub} onRename={() => onRenameSub(sub)} onRemove={() => onRemoveSub(sub)} />
+                ))}
+              </AnimatePresence>
+              {defaultSubs.length === 0 && (
                 <p className="text-xs italic text-muted-foreground">{t('budget.noCustomSubcategories')}</p>
               )}
             </div>
@@ -312,6 +332,11 @@ export default function Categories() {
   // { category, from } while the rename dialog is open.
   const [renaming, setRenaming] = useState(null);
   const [fixingOrphans, setFixingOrphans] = useState(false);
+  // Stay mounted through their closing animation.
+  const formDialog = useExitable(dialogOpen);
+  const deleteDialog = useExitable(deleting);
+  const renameDialog = useExitable(renaming);
+  const orphanDialog = useExitable(fixingOrphans);
 
   const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
 
@@ -341,7 +366,6 @@ export default function Categories() {
       type: form.type,
       hex: form.hex,
     });
-    setEditingCategory(null);
   };
 
   /** Skips a name the category already has, including a built-in one typed in translation. */
@@ -490,43 +514,46 @@ export default function Categories() {
         </Card>
       )}
 
-      {dialogOpen && (
+      {formDialog.mounted && (
         <CategoryFormDialog
           open={dialogOpen}
-          onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditingCategory(null); }}
+          // `editingCategory` is left as is on close so the title doesn't flip
+          // while the dialog animates out; opening it always sets it first.
+          onOpenChange={setDialogOpen}
           category={editingCategory ? customCategories[editingCategory] : null}
           onSubmit={editingCategory ? handleEditCategory : handleCreateCategory}
         />
       )}
 
-      {renaming && (
+      {renameDialog.mounted && (
         <RenameSubDialog
-          category={categoryLabel(allCategories[renaming.category], t)}
-          from={renaming.from}
-          count={subCount(renaming.category, renaming.from)}
-          existing={getSubcategories(renaming.category, customSubcategories, customCategories)}
+          open={renameDialog.open}
+          category={categoryLabel(allCategories[renameDialog.value.category], t)}
+          from={renameDialog.value.from}
+          count={subCount(renameDialog.value.category, renameDialog.value.from)}
+          existing={getSubcategories(renameDialog.value.category, customSubcategories, customCategories)}
           onClose={() => setRenaming(null)}
-          onConfirm={(to) => renameSubcategory(renaming.category, renaming.from, to)}
+          onConfirm={(to) => renameSubcategory(renameDialog.value.category, renameDialog.value.from, to)}
         />
       )}
 
-      {deleting && (
+      {deleteDialog.mounted && (
         <ReassignDialog
-          open
+          open={deleteDialog.open}
           onOpenChange={(v) => { if (!v) setDeleting(null); }}
-          title={t('categories.deleteTitle', { name: customCategories[deleting.id]?.label || deleting.id })}
-          description={t('categories.deleteHasTx', { count: deleting.count })}
-          count={deleting.count}
-          options={categoryOptions(deleting.id)}
-          defaultTarget={DEFAULT_TARGET[customCategories[deleting.id]?.type]}
+          title={t('categories.deleteTitle', { name: customCategories[deleteDialog.value.id]?.label || deleteDialog.value.id })}
+          description={t('categories.deleteHasTx', { count: deleteDialog.value.count })}
+          count={deleteDialog.value.count}
+          options={categoryOptions(deleteDialog.value.id)}
+          defaultTarget={DEFAULT_TARGET[customCategories[deleteDialog.value.id]?.type]}
           confirmLabel={t('common.delete')}
-          onConfirm={(moveTo) => deleteCustomCategory(deleting.id, { moveTo })}
+          onConfirm={(moveTo) => deleteCustomCategory(deleteDialog.value.id, { moveTo })}
         />
       )}
 
-      {fixingOrphans && (
+      {orphanDialog.mounted && (
         <ReassignDialog
-          open
+          open={orphanDialog.open}
           onOpenChange={setFixingOrphans}
           title={t('categories.orphanDialogTitle')}
           description={t('categories.orphanBody')}

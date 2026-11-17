@@ -7,6 +7,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { useState, useRef, useLayoutEffect, lazy, Suspense } from "react";
+import { AnimatePresence, LayoutGroup, m } from "motion/react";
 import {
   TooltipProvider,
   Tooltip,
@@ -47,6 +48,8 @@ import { useBackup } from "@/hooks/useGoogleBackup";
 import { useT } from "@/hooks/useT";
 import useTheme from "@/hooks/useTheme";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
+import MotionProvider from "@/components/MotionProvider";
+import { EASE_FLUID, SPRING, SPRING_SNAPPY } from "@/lib/motion";
 
 // Recharts and the Anthropic SDK are heavy; keep them out of the first paint.
 const Analytics = lazy(() => import("@/pages/Analytics"));
@@ -101,14 +104,23 @@ function SidebarNav({ onNavigate }) {
             to={to}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[13.5px] transition-colors",
+              "press relative flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[13.5px]",
               active
-                ? "bg-[var(--primary-soft)] font-bold text-primary"
+                ? "font-bold text-primary"
                 : "font-semibold text-muted-foreground hover:text-foreground",
             )}
           >
-            <Icon name={icon} size={20} />
-            {t(labelKey)}
+            {/* One highlight that slides to the page you pick. */}
+            {active && (
+              <m.span
+                layoutId="sidebar-active"
+                transition={SPRING}
+                className="absolute inset-0 bg-[var(--primary-soft)]"
+                style={{ borderRadius: 10 }}
+              />
+            )}
+            <Icon name={icon} size={20} className="relative" />
+            <span className="relative">{t(labelKey)}</span>
           </NavLink>
         );
       })}
@@ -162,21 +174,26 @@ function SidebarFooter() {
   );
 }
 
-function SidebarBody({ onEditName, onNavigate }) {
+/**
+ * `group` keeps each copy of the sidebar (desktop, and the phone's drawer)
+ * in its own layout group, so their sliding highlights never jump between
+ * them.
+ */
+function SidebarBody({ group, onEditName, onNavigate }) {
   return (
-    <>
+    <LayoutGroup id={group}>
       <SidebarBrand onEditName={onEditName} onNavigate={onNavigate} />
       <div className="mx-5 mb-3 h-px bg-border" />
       <SidebarNav onNavigate={onNavigate} />
       <SidebarFooter />
-    </>
+    </LayoutGroup>
   );
 }
 
 function DesktopSidebar({ onEditName }) {
   return (
     <aside className="sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar lg:flex">
-      <SidebarBody onEditName={onEditName} />
+      <SidebarBody group="desktop" onEditName={onEditName} />
     </aside>
   );
 }
@@ -187,15 +204,15 @@ function MobileSidebar({ onEditName }) {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <button
-          className="flex size-9 items-center justify-center rounded-[10px] border border-border bg-card lg:hidden"
+          className="press flex size-9 items-center justify-center rounded-[10px] border border-border bg-card lg:hidden"
           aria-label="Menu"
         >
           <Icon name="menu" size={19} />
         </button>
       </SheetTrigger>
-      <SheetContent side="left" className="flex w-[264px] flex-col bg-sidebar p-0">
+      <SheetContent side="left" aria-describedby={undefined} className="flex w-[264px] flex-col bg-sidebar p-0">
         <SheetTitle className="sr-only">Penny</SheetTitle>
-        <SidebarBody onEditName={onEditName} onNavigate={() => setOpen(false)} />
+        <SidebarBody group="drawer" onEditName={onEditName} onNavigate={() => setOpen(false)} />
       </SheetContent>
     </Sheet>
   );
@@ -288,16 +305,27 @@ function HeaderActions() {
       <button
         onClick={toggleTheme}
         aria-label={t("app.toggleTheme")}
-        className="flex size-9 items-center justify-center rounded-[10px] border border-border bg-card text-foreground transition-colors hover:text-primary"
+        className="press flex size-9 items-center justify-center overflow-hidden rounded-[10px] border border-border bg-card text-foreground hover:text-primary"
       >
-        <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} size={19} />
+        <AnimatePresence mode="popLayout" initial={false}>
+          <m.span
+            key={theme}
+            className="flex"
+            initial={{ opacity: 0, scale: 0.5, rotate: -90 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={{ opacity: 0, scale: 0.5, rotate: 90 }}
+            transition={SPRING_SNAPPY}
+          >
+            <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} size={19} />
+          </m.span>
+        </AnimatePresence>
       </button>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             aria-label={t("app.moreActions")}
-            className="flex size-9 items-center justify-center rounded-[10px] border border-border bg-card text-foreground transition-colors hover:text-primary"
+            className="press flex size-9 items-center justify-center rounded-[10px] border border-border bg-card text-foreground hover:text-primary"
           >
             <Icon name="more_vert" size={19} />
           </button>
@@ -337,44 +365,85 @@ function HeaderActions() {
   );
 }
 
+/**
+ * The pill behind the active tab's icon. It slides between tabs (shared
+ * `layoutId`), the way a native tab bar's indicator does.
+ */
+function NavPill({ active }) {
+  return (
+    <span className="relative flex h-7 w-12 items-center justify-center">
+      {active && (
+        <m.span
+          layoutId="bottom-nav-pill"
+          transition={SPRING}
+          className="absolute inset-0 bg-[var(--primary-soft)]"
+          style={{ borderRadius: 999 }}
+        />
+      )}
+    </span>
+  );
+}
+
 /** Bottom bar for phones — the design is desktop-only, so this is additive. */
 function MobileBottomNav({ onOpenMenu }) {
   const t = useT();
   const { pathname } = useLocation();
   const inBar = MOBILE_NAV.some((i) => i.to === pathname);
   const ref = useHeightVar("--bottom-nav-h");
+  const item = "press flex flex-col items-center px-1 pb-2 pt-2";
 
   return (
     <nav ref={ref} className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
-      <div className="flex justify-around">
-        {MOBILE_NAV.map(({ to, labelKey, icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                "flex flex-col items-center px-2 py-2.5 transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground",
-              )
-            }
+      <LayoutGroup id="bottom-nav">
+        <div className="flex justify-around">
+          {MOBILE_NAV.map(({ to, labelKey, icon }) => {
+            const active = pathname === to;
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                className={cn(item, active ? "text-primary" : "text-muted-foreground")}
+              >
+                <span className="relative">
+                  <NavPill active={active} />
+                  <Icon name={icon} size={21} className="absolute inset-0 m-auto size-fit" />
+                </span>
+                <span className="mt-0.5 text-[10px] font-semibold">{t(labelKey)}</span>
+              </NavLink>
+            );
+          })}
+          <button
+            data-tour="nav-more"
+            onClick={onOpenMenu}
+            className={cn(item, inBar ? "text-muted-foreground" : "text-primary")}
           >
-            <Icon name={icon} size={21} />
-            <span className="mt-0.5 text-[10px] font-semibold">{t(labelKey)}</span>
-          </NavLink>
-        ))}
-        <button
-          data-tour="nav-more"
-          onClick={onOpenMenu}
-          className={cn(
-            "flex flex-col items-center px-2 py-2.5 transition-colors",
-            inBar ? "text-muted-foreground" : "text-primary",
-          )}
-        >
-          <Icon name="apps" size={21} />
-          <span className="mt-0.5 text-[10px] font-semibold">{t("nav.more")}</span>
-        </button>
-      </div>
+            <span className="relative">
+              <NavPill active={!inBar} />
+              <Icon name="apps" size={21} className="absolute inset-0 m-auto size-fit" />
+            </span>
+            <span className="mt-0.5 text-[10px] font-semibold">{t("nav.more")}</span>
+          </button>
+        </div>
+      </LayoutGroup>
     </nav>
+  );
+}
+
+/**
+ * Each page fades up into place. Enter only, and short: pages change tens of
+ * times a day, so an exit would just delay the next one.
+ */
+function PageTransition({ children }) {
+  const { pathname } = useLocation();
+  return (
+    <m.div
+      key={pathname}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.24, ease: EASE_FLUID }}
+    >
+      {children}
+    </m.div>
   );
 }
 
@@ -406,25 +475,27 @@ function AppShell() {
             leaves room for the bottom nav, so the scroll padding goes. */}
         <main className="flex-1 px-4 pb-24 pt-6 lg:px-8 lg:pb-16 lg:pt-7 has-[[data-chat-fill]]:pb-0">
           <div className="mx-auto w-full max-w-[1240px]">
-            <Suspense fallback={<RouteFallback />}>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/today" element={<Today />} />
-                <Route path="/transactions" element={<Transactions />} />
-                <Route path="/insights" element={<Insights />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/budget" element={<Budget />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/portfolio" element={<Portfolio />} />
-                <Route path="/accounts" element={<Accounts />} />
-                <Route path="/categories" element={<Categories />} />
-                <Route path="/split-bill" element={<SplitBill />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                {/* The previous build's catch-all page is gone. */}
-                <Route path="/more" element={<Navigate to="/settings" replace />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
+            <PageTransition>
+              <Suspense fallback={<RouteFallback />}>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/today" element={<Today />} />
+                  <Route path="/transactions" element={<Transactions />} />
+                  <Route path="/insights" element={<Insights />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/budget" element={<Budget />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/portfolio" element={<Portfolio />} />
+                  <Route path="/accounts" element={<Accounts />} />
+                  <Route path="/categories" element={<Categories />} />
+                  <Route path="/split-bill" element={<SplitBill />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  {/* The previous build's catch-all page is gone. */}
+                  <Route path="/more" element={<Navigate to="/settings" replace />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </PageTransition>
           </div>
         </main>
       </div>
@@ -433,9 +504,10 @@ function AppShell() {
 
       {/* Full nav for phones, opened from the bottom bar's menu button. */}
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="left" className="flex w-[264px] flex-col bg-sidebar p-0">
+        <SheetContent side="left" aria-describedby={undefined} className="flex w-[264px] flex-col bg-sidebar p-0">
           <SheetTitle className="sr-only">Penny</SheetTitle>
           <SidebarBody
+            group="menu"
             onEditName={() => setEditNameOpen(true)}
             onNavigate={() => setMenuOpen(false)}
           />
@@ -474,13 +546,15 @@ export default function App() {
     <>
       <VercelAnalytics />
       <BrowserRouter>
-        <TooltipProvider>
-          <HydrationGate>
-            <BackupProvider>
-              <AppShell />
-            </BackupProvider>
-          </HydrationGate>
-        </TooltipProvider>
+        <MotionProvider>
+          <TooltipProvider>
+            <HydrationGate>
+              <BackupProvider>
+                <AppShell />
+              </BackupProvider>
+            </HydrationGate>
+          </TooltipProvider>
+        </MotionProvider>
       </BrowserRouter>
     </>
   );

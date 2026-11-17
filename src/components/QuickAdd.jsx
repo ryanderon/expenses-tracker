@@ -6,7 +6,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import CurrencyInput from '@/components/ui/currency-input';
-import { Icon, ChoicePill } from '@/components/ui/design';
+import { Icon, ChoiceGroup, ChoicePill } from '@/components/ui/design';
+import { AutoHeight, Collapse } from '@/components/ui/motion';
 import { DateField } from '@/components/ui/date-fields';
 import useStore from '@/store/useStore';
 import { useT } from '@/hooks/useT';
@@ -133,35 +134,33 @@ function QuickAddForm({ editing, defaultType, onDone }) {
   return (
     <form onSubmit={submit} className="flex flex-col">
       <FieldLabel>{t('quickAdd.category')}</FieldLabel>
-      <div className="mb-4 flex flex-wrap gap-1.5">
+      <ChoiceGroup className="mb-4">
         {categoryList.map((c) => (
           <ChoicePill
             key={c.id}
             active={category === c.id}
+            color={c.hex}
             onClick={() => pickCategory(c.id)}
-            style={category === c.id ? { backgroundColor: c.hex, color: '#fff' } : undefined}
           >
             {categoryLabel(c, t)}
           </ChoicePill>
         ))}
-      </div>
+      </ChoiceGroup>
 
-      {isReceivable && (
-        <>
-          <FieldLabel>{t('quickAdd.flow')}</FieldLabel>
-          <div className="mb-1.5 flex flex-wrap gap-1.5">
-            <ChoicePill active={flow === 'out'} onClick={() => setFlow('out')}>
-              {t('quickAdd.flowOut')}
-            </ChoicePill>
-            <ChoicePill active={flow === 'in'} onClick={() => setFlow('in')}>
-              {t('quickAdd.flowIn')}
-            </ChoicePill>
-          </div>
-          <p className="mb-4 text-xs text-muted-foreground">
-            {t(flow === 'in' ? 'quickAdd.flowInHint' : 'quickAdd.flowOutHint')}
-          </p>
-        </>
-      )}
+      <Collapse show={isReceivable} innerClassName="pb-4">
+        <FieldLabel>{t('quickAdd.flow')}</FieldLabel>
+        <ChoiceGroup className="mb-1.5">
+          <ChoicePill active={flow === 'out'} onClick={() => setFlow('out')}>
+            {t('quickAdd.flowOut')}
+          </ChoicePill>
+          <ChoicePill active={flow === 'in'} onClick={() => setFlow('in')}>
+            {t('quickAdd.flowIn')}
+          </ChoicePill>
+        </ChoiceGroup>
+        <p className="text-xs text-muted-foreground">
+          {t(flow === 'in' ? 'quickAdd.flowInHint' : 'quickAdd.flowOutHint')}
+        </p>
+      </Collapse>
 
       <FieldLabel>{t('quickAdd.amount')}</FieldLabel>
       <CurrencyInput
@@ -174,25 +173,27 @@ function QuickAddForm({ editing, defaultType, onDone }) {
         style={{ color: selected?.hex }}
       />
 
-      {subcategories.length > 0 && (
-        <>
-          <FieldLabel>{t('transactions.fieldSubcategory')}</FieldLabel>
-          <div className="mb-4 flex flex-wrap gap-1.5">
+      <Collapse show={subcategories.length > 0} innerClassName="pb-4">
+        <FieldLabel>{t('transactions.fieldSubcategory')}</FieldLabel>
+        {/* Another category's subcategories can take more or fewer rows. */}
+        <AutoHeight>
+          {/* Keyed by category, so the highlight doesn't fly between unrelated lists. */}
+          <ChoiceGroup key={category}>
             {subcategories.map((s) => (
               <ChoicePill key={s} active={subcategory === s} onClick={() => setSubcategory(s)}>
                 {subcategoryLabel(s, t)}
               </ChoicePill>
             ))}
-          </div>
-        </>
-      )}
+          </ChoiceGroup>
+        </AutoHeight>
+      </Collapse>
 
       <FieldLabel>
         {needsDestination
           ? t('transactions.fieldFromAccount')
           : t(isReceivable && flow === 'in' ? 'quickAdd.accountIn' : 'quickAdd.account')}
       </FieldLabel>
-      <div className="mb-4 flex flex-wrap gap-1.5">
+      <ChoiceGroup className="mb-4">
         {accounts.map((a) => (
           <ChoicePill
             key={a.id}
@@ -202,26 +203,24 @@ function QuickAddForm({ editing, defaultType, onDone }) {
             {a.name}
           </ChoicePill>
         ))}
-      </div>
+      </ChoiceGroup>
 
-      {needsDestination && (
-        <>
-          <FieldLabel>{t('transactions.fieldToAccount')}</FieldLabel>
-          <div className="mb-4 flex flex-wrap gap-1.5">
-            {accounts
-              .filter((a) => a.id !== account)
-              .map((a) => (
-                <ChoicePill
-                  key={a.id}
-                  active={toAccount === a.id}
-                  onClick={() => { setToAccount(a.id); setError(null); }}
-                >
-                  {a.name}
-                </ChoicePill>
-              ))}
-          </div>
-        </>
-      )}
+      <Collapse show={needsDestination} innerClassName="pb-4">
+        <FieldLabel>{t('transactions.fieldToAccount')}</FieldLabel>
+        <ChoiceGroup>
+          {accounts
+            .filter((a) => a.id !== account)
+            .map((a) => (
+              <ChoicePill
+                key={a.id}
+                active={toAccount === a.id}
+                onClick={() => { setToAccount(a.id); setError(null); }}
+              >
+                {a.name}
+              </ChoicePill>
+            ))}
+        </ChoiceGroup>
+      </Collapse>
 
       <FieldLabel>{t('quickAdd.date')}</FieldLabel>
       <div className="mb-4">
@@ -239,7 +238,9 @@ function QuickAddForm({ editing, defaultType, onDone }) {
         className="mb-5 h-11 rounded-[10px]"
       />
 
-      {error && <p className="mb-3 text-xs text-danger">{error}</p>}
+      <Collapse show={!!error} innerClassName="pb-3">
+        <p className="text-xs text-danger">{error}</p>
+      </Collapse>
 
       <div className="flex gap-2.5">
         <Button

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { AnimatePresence, m } from 'motion/react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,7 @@ import useChatStore, { isActive } from '@/store/useChatStore';
 import { getModelInfo, getProviderInfo, keyForModel, AI_MODELS } from '@/lib/aiModels';
 import { QUICK_PROMPTS } from '@/lib/aiContext';
 import { cn, getMonthKey, getMonthRange } from '@/lib/utils';
+import { EASE_FLUID, POP, SPRING_SNAPPY } from '@/lib/motion';
 import { useT, useDateFormat } from '@/hooks/useT';
 import { usePeriodLabel, useCycle } from '@/hooks/useCycle';
 import PageHeader from '@/components/PageHeader';
@@ -216,14 +218,21 @@ function ModelPicker({ value, models, onChange }) {
       </SelectTrigger>
       <SelectContent position="popper" side="top" align="start">
         <SelectGroup>
-          {models.map((m) => (
-            <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+          {models.map((model) => (
+            <SelectItem key={model.id} value={model.id}>{model.label}</SelectItem>
           ))}
         </SelectGroup>
       </SelectContent>
     </Select>
   );
 }
+
+// Two controls swapping in one spot (Send ⇄ Stop).
+const SWAP = {
+  initial: { opacity: 0, scale: 0.6 },
+  animate: { opacity: 1, scale: 1, transition: SPRING_SNAPPY },
+  exit: { opacity: 0, scale: 0.6, transition: { duration: 0.12 } },
+};
 
 function Composer({ busy, placeholder, onSend, onStop, controls }) {
   const t = useT();
@@ -270,27 +279,36 @@ function Composer({ busy, placeholder, onSend, onStop, controls }) {
       />
       <div className="flex items-center gap-1.5 pt-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">{controls}</div>
-        {busy ? (
-          <button
-            type="button"
-            onClick={onStop}
-            aria-label={t('insights.stop')}
-            title={t('insights.stop')}
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-85"
-          >
-            <Icon name="stop" size={20} />
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={!value.trim()}
-            aria-label={t('insights.send')}
-            title={t('insights.send')}
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-35"
-          >
-            <Icon name="arrow_upward" size={20} />
-          </button>
-        )}
+        {/* Send and Stop trade places in the same spot. */}
+        <div className="relative size-9 shrink-0">
+          <AnimatePresence initial={false}>
+            {/* The wrapper animates, so the buttons keep their own
+                disabled and hover opacity. */}
+            <m.span key={busy ? 'stop' : 'send'} {...SWAP} className="absolute inset-0 flex">
+              {busy ? (
+                <button
+                  type="button"
+                  onClick={onStop}
+                  aria-label={t('insights.stop')}
+                  title={t('insights.stop')}
+                  className="press flex size-full items-center justify-center rounded-full bg-foreground text-background hover:opacity-85"
+                >
+                  <Icon name="stop" size={20} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!value.trim()}
+                  aria-label={t('insights.send')}
+                  title={t('insights.send')}
+                  className="press flex size-full items-center justify-center rounded-full bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-35"
+                >
+                  <Icon name="arrow_upward" size={20} />
+                </button>
+              )}
+            </m.span>
+          </AnimatePresence>
+        </div>
       </div>
     </form>
   );
@@ -368,12 +386,19 @@ function Answer({ exchange, isLast, onRetry }) {
         {getModelInfo(model).label}
       </div>
 
-      {answer && <Markdown content={answer} />}
+      {/* The first words fade in where the typing dots were. */}
+      {answer && (
+        <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, ease: EASE_FLUID }}>
+          <Markdown content={answer} />
+        </m.div>
+      )}
 
       {working && !answer && (
-        <TypingIndicator
-          label={`${t(status === 'thinking' ? 'insights.thinking' : 'insights.reading')}…`}
-        />
+        <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, delay: 0.1 }}>
+          <TypingIndicator
+            label={`${t(status === 'thinking' ? 'insights.thinking' : 'insights.reading')}…`}
+          />
+        </m.div>
       )}
 
       {status === 'error' && (
@@ -427,19 +452,40 @@ function Answer({ exchange, isLast, onRetry }) {
 function Exchange({ exchange, isLast, minHeight, onRetry }) {
   return (
     <div data-exchange={exchange.id} className="flex flex-col gap-5" style={{ minHeight }}>
-      <div className="ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] rounded-br-md bg-secondary px-4 py-2.5 text-[14.5px] leading-relaxed">
+      {/* A sent question rises out of the composer's corner. */}
+      <m.div
+        initial={{ opacity: 0, y: 16, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={SPRING_SNAPPY}
+        style={{ transformOrigin: '100% 100%' }}
+        className="ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] rounded-br-md bg-secondary px-4 py-2.5 text-[14.5px] leading-relaxed"
+      >
         {exchange.question}
-      </div>
+      </m.div>
       <Answer exchange={exchange} isLast={isLast} onRetry={onRetry} />
     </div>
   );
 }
 
+// Suggestions arrive one after another, 40ms apart: enough to read as a
+// list being dealt, too short to keep anyone waiting.
+const STAGGER = { animate: { transition: { staggerChildren: 0.04 } } };
+const RISE = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.3, ease: EASE_FLUID } },
+};
+
 function EmptyChat({ period, minHeight, onPick }) {
   const t = useT();
   return (
-    <div className="flex flex-col justify-center gap-5" style={{ minHeight }}>
-      <div className="flex flex-col items-center gap-2.5 text-center">
+    <m.div
+      variants={STAGGER}
+      initial="initial"
+      animate="animate"
+      className="flex flex-col justify-center gap-5"
+      style={{ minHeight }}
+    >
+      <m.div variants={RISE} className="flex flex-col items-center gap-2.5 text-center">
         <IconBadge name="auto_awesome" size={42} />
         <div>
           <h2 className="text-[16px] font-extrabold">{t('insights.emptyTitle')}</h2>
@@ -447,25 +493,26 @@ function EmptyChat({ period, minHeight, onPick }) {
             {t('insights.emptyBody', { period })}
           </p>
         </div>
-      </div>
-      <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
+      </m.div>
+      <m.div variants={STAGGER} className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
         {QUICK_PROMPTS.map((p) => {
           const look = PROMPT_ICONS[p.id] || PROMPT_ICONS.overview;
           return (
-            <button
+            <m.button
               key={p.id}
               type="button"
+              variants={RISE}
               onClick={() => onPick(t(p.promptKey))}
-              className="flex items-center gap-3 rounded-2xl border border-border bg-card px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/40"
+              className="press flex items-center gap-3 rounded-2xl border border-border bg-card px-3 py-2 text-left hover:border-primary/40 hover:bg-secondary/40"
             >
               <IconBadge name={look.icon} tone={look.tone} size={32} />
               <span className="min-w-0 flex-1 text-[13.5px] font-semibold">{t(p.labelKey)}</span>
               <Icon name="arrow_forward" size={16} className="text-muted-foreground" />
-            </button>
+            </m.button>
           );
         })}
-      </div>
-    </div>
+      </m.div>
+    </m.div>
   );
 }
 
@@ -489,7 +536,7 @@ function AiChat({ years }) {
   const setScope = useChatStore((s) => s.setScope);
 
   const busy = exchanges.some(isActive);
-  const usableModels = AI_MODELS.filter((m) => keyForModel(aiSettings, m.id));
+  const usableModels = AI_MODELS.filter((model) => keyForModel(aiSettings, model.id));
   const monthKey = scope.monthKey || getMonthKey(new Date());
   const period = scope.type === 'year' ? scope.year : periodLabel(monthKey);
 
@@ -571,10 +618,13 @@ function AiChat({ years }) {
           className="relative h-full overflow-y-auto overscroll-contain"
         >
           <div ref={contentRef} className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-0.5 pt-4 pb-6">
-            {exchanges.length === 0 ? (
+            {exchanges.length === 0 && (
               <EmptyChat period={period} minHeight={fill} onPick={send} />
-            ) : (
-              exchanges.map((ex, i) => (
+            )}
+            {/* Always mounted, so only exchanges added from now on animate:
+                coming back to a thread shows it as it was. */}
+            <AnimatePresence initial={false}>
+              {exchanges.map((ex, i) => (
                 <Exchange
                   key={ex.id}
                   exchange={ex}
@@ -582,24 +632,31 @@ function AiChat({ years }) {
                   minHeight={i === exchanges.length - 1 ? fill : undefined}
                   onRetry={onRetry}
                 />
-              ))
-            )}
+              ))}
+            </AnimatePresence>
           </div>
         </div>
 
         {/* Soft edge so text fades out under the composer instead of being cut. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-linear-to-t from-background to-transparent" />
 
-        {!atBottom && exchanges.length > 0 && (
-          <button
-            type="button"
-            onClick={() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })}
-            aria-label={t('insights.scrollDown')}
-            className="absolute bottom-3 left-1/2 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-(--shadow-card) transition-colors hover:text-primary"
-          >
-            <Icon name="arrow_downward" size={18} />
-          </button>
-        )}
+        <AnimatePresence>
+          {!atBottom && exchanges.length > 0 && (
+            <m.button
+              key="scroll-down"
+              type="button"
+              variants={POP}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              onClick={() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })}
+              aria-label={t('insights.scrollDown')}
+              className="absolute bottom-3 left-1/2 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-(--shadow-card) transition-colors hover:text-primary"
+            >
+              <Icon name="arrow_downward" size={18} />
+            </m.button>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="mx-auto w-full max-w-3xl pt-2">
@@ -630,6 +687,13 @@ function AiChat({ years }) {
 
 // --- Page ------------------------------------------------------------------
 
+// The content under the tabs fades in when you switch; the pill does the moving.
+const TAB_FADE = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  transition: { duration: 0.22, ease: EASE_FLUID },
+};
+
 export default function Insights() {
   const t = useT();
   const tab = useChatStore((s) => s.tab);
@@ -651,6 +715,7 @@ export default function Insights() {
 
   const tabs = (
     <SegmentedTabs
+      id="insights-tabs"
       value={tab}
       onChange={setTab}
       options={[
@@ -676,7 +741,9 @@ export default function Insights() {
         </div>
         <div className="flex flex-col gap-4">
           {tabs}
-          <InsightsSummary monthKey={summaryMonth} />
+          <m.div {...TAB_FADE}>
+            <InsightsSummary monthKey={summaryMonth} />
+          </m.div>
         </div>
       </>
     );
@@ -701,17 +768,24 @@ export default function Insights() {
 
       <div className="flex items-center justify-between gap-3">
         {tabs}
-        {hasThread && (
-          <button
-            type="button"
-            onClick={reset}
-            className="flex h-10 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-[12.5px] font-bold text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <Icon name="edit_square" size={17} />
-            {/* Icon only on narrow phones, where the label would wrap the tabs. */}
-            <span className="max-[389px]:sr-only">{t('insights.newChat')}</span>
-          </button>
-        )}
+        <AnimatePresence>
+          {hasThread && (
+            <m.button
+              key="new-chat"
+              type="button"
+              variants={POP}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              onClick={reset}
+              className="press flex h-10 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-[12.5px] font-bold text-muted-foreground hover:text-foreground"
+            >
+              <Icon name="edit_square" size={17} />
+              {/* Icon only on narrow phones, where the label would wrap the tabs. */}
+              <span className="max-[389px]:sr-only">{t('insights.newChat')}</span>
+            </m.button>
+          )}
+        </AnimatePresence>
       </div>
 
       {!hasKey && <SetupPrompt />}
@@ -720,7 +794,11 @@ export default function Insights() {
           <EmptyState icon="receipt_long" title={t('insights.noDataTitle')} body={t('insights.noDataBody')} />
         </div>
       )}
-      {hasKey && hasData && <AiChat years={years} />}
+      {hasKey && hasData && (
+        <m.div {...TAB_FADE} className="flex min-h-0 flex-1 flex-col">
+          <AiChat years={years} />
+        </m.div>
+      )}
     </div>
   );
 }

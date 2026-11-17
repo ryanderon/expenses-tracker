@@ -7,7 +7,7 @@ description: Feature map and domain rules for Penny, this repo's personal budget
 
 Penny is a single-user budgeting PWA, built for someone in Indonesia (IDR, Bahasa Indonesia UI available). It has no backend: all data lives in the browser, and AI and price calls go straight from the browser to the providers.
 
-- **Stack:** React 19, Vite 8, Tailwind v4, shadcn/radix, zustand persisted to IndexedDB. Plain JS, no TypeScript.
+- **Stack:** React 19, Vite 8, Tailwind v4, shadcn/radix, Motion for React (`motion/react`), zustand persisted to IndexedDB. Plain JS, no TypeScript.
 - **Detail files** (open only when the task needs them):
   - Per-page detail → [references/pages.md](references/pages.md)
   - Store shape, migrations, backup keys → [references/data-model.md](references/data-model.md)
@@ -22,6 +22,7 @@ Penny is a single-user budgeting PWA, built for someone in Indonesia (IDR, Bahas
   - **Let Google Fonts through** (`fonts.googleapis.com`, `fonts.gstatic.com`) when checking layout. Without the icon font every icon renders as its name ("calendar_month"), which widens buttons and reports overflow that real phones don't have.
   - **Mobile widths:** check 320, 360, 375, 390 and 412 for `document.documentElement.scrollWidth > innerWidth`. The theme is the app's own `dark` class on `<html>` (stored in `localStorage['penny-theme']`), not `prefers-color-scheme`, so toggle the class for light mode.
   - **Service worker:** it registers only in production and skips localhost requests. To test offline behaviour, serve `dist/` on `127.0.0.1` (a secure context), load once, then relaunch the same persistent profile with the font hosts unreachable (`--host-resolver-rules`) and the HTTP cache cleared.
+- **Motion checks:** sample a value every `requestAnimationFrame` while the action runs (position, height, opacity) and assert it takes several distinct values; a jump shows as one or two. Read animated amounts only after they settle: `AnimatedNumber` takes 0.6s.
 - **Full audit:** compute the expected figures independently from the user's backup (a separate script that re-derives every rule, not app code). Then drive every page and flow (add, edit and delete, transfer, receivable, budget fill, backup and restore, Excel, AI snapshot) and compare each number. The last audit passed 197/197 checks on the user's data, including the AI snapshot's budget, projection, goal and same-days fields.
 
 ## File map
@@ -45,6 +46,7 @@ Penny is a single-user budgeting PWA, built for someone in Indonesia (IDR, Bahas
 | Backup | `src/lib/googleDrive.js`, `src/hooks/useGoogleBackup.js`, `src/components/BackupProvider.jsx` |
 | i18n | `src/lib/i18n.js`, `src/hooks/useT.js`, `src/locales/en.js`, `src/locales/id.js` |
 | Design primitives | `src/components/ui/design.jsx`, `src/components/ui/date-fields.jsx`, tokens in `src/index.css` |
+| Motion | `src/lib/motion.js` (curves, springs, presets), `src/components/MotionProvider.jsx`, `src/components/ui/motion.jsx` (`Collapse`, `AutoHeight`, `AnimatedNumber`), `src/hooks/useExitable.js`; CSS `--ease-fluid/glide/drawer`, `press`, `ring-fill` in `index.css` |
 
 ## Category types: how money is counted
 
@@ -152,6 +154,41 @@ Transactions are `{ id, createdAt, category, subcategory, account, amount (alway
   - The layout steps back up only when the width grows, not while a streaming reply adds rows. `data-layout` on the `<table>` shows the current one.
 - **Tab row:** below 390px the "Chat baru" button is icon-only; its label stays for screen readers, so the tabs don't wrap.
 
+## Motion
+
+The user asked for animation everywhere, with shared layouts. The rules:
+
+- **Elements:** always `m.*` from `motion/react`, never `motion.*`. `LazyMotion strict` (with `domMax`, needed for layout, `layoutId` and drag) throws on `motion.*`. ESLint's `varsIgnorePattern` allows `m`, since it's only used in JSX.
+  - Core ESLint can't see an undefined JSX component, so after adding one, check its import.
+- **Timing** comes from `lib/motion.js`. Don't invent values.
+  - Springs with `bounce: 0`: `SPRING`, `SPRING_SNAPPY`, `SPRING_DIALOG`.
+  - `EASE_FLUID` for entering, `EXIT` (short) for leaving.
+  - `COLLAPSE` / `LIST_ITEM` for height in and out, and `POP` for small controls.
+- **Shared layout indicators** (`layoutId`):
+  - `SegmentedTabs`: one pill per strip, scoped by `useId`. Pass `id` when the strip remounts in another layout, as Insights does with `insights-tabs`.
+  - `ChoiceGroup` + `ChoicePill`: `color` tints the active pill.
+  - The sidebar: `LayoutGroup` per copy (`desktop`, `drawer`, `menu`).
+  - The bottom nav's `NavPill`.
+  - Give a layout-animated element an inline pixel `borderRadius`, or the corners warp.
+- **Dialogs and sheets** (`ui/dialog.jsx`, `ui/sheet.jsx`) animate with Motion.
+  - The root keeps `open` in context. Content renders inside `AnimatePresence` with `forceMount` on Radix's Portal, Overlay and Content (`asChild`).
+  - The sheet slides fully with `EASE_DRAWER`. Left and right sheets drag closed, and the overlay's opacity follows the panel.
+  - Popovers, dropdowns, selects and tooltips stay Radix CSS (`duration-150 ease-fluid`, exit 100ms).
+- **Dialogs mounted conditionally** (`{deleting && <Dialog/>}`) go through `useExitable(value)`. It keeps them mounted, with the last value, for their exit.
+  - Don't clear `editing` state on close (the title would flip mid-exit). Set it when opening instead.
+- **Lists:** `AnimatePresence initial={false}` must stay mounted even when the list is empty (render the empty state beside it). Otherwise the first item mounts together with it and never animates.
+  - The Transactions list is keyed by its filters, so search and filters swap it instantly. Only adding and deleting animate.
+  - Chips and cards that reflow use `mode="popLayout"` + `layout`, inside a `relative` parent.
+- **Amounts:** `AnimatedNumber` is a 0.6s tween, not a spring: a spring's tail kept moving the last rupiah digits for over a second.
+  - Used for the Dashboard hero and stat cards, Today's hero and "spent today", the Budget stats and spending card, and Accounts net worth.
+  - It doesn't animate on mount.
+- **Page change:** `PageTransition` in `App.jsx` fades in with an 8px rise, enter only, keyed by pathname.
+- **Don't animate frequent or typed things:** search, filters and keystrokes.
+- **Inline styles:** Motion writes inline `opacity` and `transform`. When a button relies on `disabled:` or `hover:` opacity classes, animate a wrapper instead (see the composer's Send/Stop).
+- **Reduced motion:** `MotionConfig reducedMotion="user"` keeps fades and drops movement. `index.css` zeroes tw-animate's translate and scale vars with `!important`.
+- **Bundle:** Motion adds about 57 kB gzip to the first load. `xlsx` is loaded inside `exportToExcel` on first use, which saves 91 kB. First load is 270 kB gzip vs 304 kB before the motion work (2026-11-17).
+- **Verified on 2026-11-17** at 390px with the user's data. The motion pass passed 34/34 checks, frame-sampled: nav pill, drawer drag, dialog exit, chips, list rows, collapses, tab pill across layouts, chat, tour spotlight, reduced motion, and no React warnings. The audit passed 197/197.
+
 ## Cross-cutting conventions
 
 - **i18n:**
@@ -159,7 +196,7 @@ Transactions are `{ id, createdAt, category, subcategory, account, amount (alway
   - `t('a.b', { var })` fills `{var}` placeholders.
   - Category names go through `categoryLabel(cat, t)` (uses `labelKey`). Subcategory names are stored as English strings on transactions and displayed through `subcategoryLabel(name, t)` → `subcategories.<Name>`.
 - **Design:**
-  - Use the primitives in `design.jsx`: `Panel`, `StatCard`, `IconBadge` (tones primary, teal, violet, amber, sky, danger, muted), `SegmentedTabs`, `ChoicePill`, `SoftBadge`, `EmptyState`, `StackedBar`, `LegendRow`, `Meter`, `Ring`.
+  - Use the primitives in `design.jsx`: `Panel`, `StatCard`, `IconBadge` (tones primary, teal, violet, amber, sky, danger, muted), `SegmentedTabs`, `ChoiceGroup` / `ChoicePill`, `SoftBadge`, `EmptyState`, `StackedBar`, `LegendRow`, `Meter`, `Ring`. For buttons outside the shared `<Button>`, use the `press` utility in place of `transition-colors`.
   - Icons are Material Symbols via `<Icon name="..." />`; the full font is loaded, so any name works.
   - Colors are CSS vars defined in `:root` and `.dark` in `index.css` (`--primary`, `--teal`, `--violet`, `--amber`, `--sky`, `--danger`, each with a `-soft` variant).
   - Today, Budget, Settings, SplitBill, Portfolio and Categories still use older shadcn `Card` and lucide icons.
@@ -210,6 +247,7 @@ Transactions are `{ id, createdAt, category, subcategory, account, amount (alway
 
 ## Known gaps
 
+- **Settings' backup-conflict dialog** is mounted only while there's a conflict, so it closes without its exit animation. It's rare, so it doesn't use `useExitable` yet.
 - **Unusable category names:** a custom category whose label has no Latin letters or digits gets an empty id. Creation is refused with the "already exists" message.
 - **Mixed UI generations:** Today, Budget, Settings, SplitBill, Portfolio and Categories still use the older shadcn/lucide look.
 - **Investment accounts vs portfolio:** an investment account's balance and the stock portfolio's value both count toward net worth. That's right only while holdings aren't also inside that balance (true for this user, confirmed).

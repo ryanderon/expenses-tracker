@@ -22,6 +22,7 @@ import usePortfolio from '@/hooks/usePortfolio';
 import PageHeader from '@/components/PageHeader';
 import { DateField } from '@/components/ui/date-fields';
 import { cn } from '@/lib/utils';
+import { Collapse } from '@/components/ui/motion';
 
 /** Prices are per-share and often small, so IDR formatting needs decimals. */
 function formatMoney(value, currency = 'IDR', maxDecimals = 0) {
@@ -336,7 +337,7 @@ function HoldingRow({ row, t, dates, quoteError }) {
             </p>
           </div>
 
-          <ChevronDown className={cn('size-4 text-muted-foreground shrink-0 mt-1 transition-transform', open && 'rotate-180')} />
+          <ChevronDown className={cn('size-4 text-muted-foreground shrink-0 mt-1 transition-transform duration-300 ease-fluid', open && 'rotate-180')} />
         </button>
 
         {quoteError && (
@@ -345,8 +346,7 @@ function HoldingRow({ row, t, dates, quoteError }) {
           </p>
         )}
 
-        {open && (
-          <div className="mt-4 pt-4 border-t border-border flex flex-col gap-3">
+        <Collapse show={open} innerClassName="mt-4 pt-4 border-t border-border flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <p className="text-muted-foreground">{t('portfolio.lastPrice')}</p>
@@ -407,8 +407,7 @@ function HoldingRow({ row, t, dates, quoteError }) {
             >
               <Trash2 data-icon="inline-start" /> {t('portfolio.removeHolding')}
             </Button>
-          </div>
-        )}
+        </Collapse>
       </CardContent>
     </Card>
   );
