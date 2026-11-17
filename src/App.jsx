@@ -6,7 +6,7 @@ import {
   NavLink,
   useLocation,
 } from "react-router-dom";
-import { useState, useRef, useLayoutEffect, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, lazy, Suspense } from "react";
 import { AnimatePresence, LayoutGroup, m } from "motion/react";
 import {
   TooltipProvider,
@@ -31,12 +31,6 @@ import {
 import { Icon } from "@/components/ui/design";
 import Logo from "@/components/Logo";
 import Dashboard from "@/pages/Dashboard";
-import Today from "@/pages/Today";
-import Transactions from "@/pages/Transactions";
-import Budget from "@/pages/Budget";
-import Accounts from "@/pages/Accounts";
-import Categories from "@/pages/Categories";
-import SplitBill from "@/pages/SplitBill";
 import useStore from "@/store/useStore";
 import { exportToExcel } from "@/lib/excel";
 import { cn } from "@/lib/utils";
@@ -51,12 +45,69 @@ import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import MotionProvider from "@/components/MotionProvider";
 import { EASE_FLUID, SPRING, SPRING_SNAPPY } from "@/lib/motion";
 
-// Recharts and the Anthropic SDK are heavy; keep them out of the first paint.
-const Analytics = lazy(() => import("@/pages/Analytics"));
-const Reports = lazy(() => import("@/pages/Reports"));
-const Portfolio = lazy(() => import("@/pages/Portfolio"));
-const Insights = lazy(() => import("@/pages/Insights"));
-const SettingsPage = lazy(() => import("@/pages/Settings"));
+/**
+ * Only the Dashboard ("/") ships in the first bundle. Every other page loads
+ * on demand, and `prefetchPages` fetches them all once the app is idle, so
+ * moving around afterwards is as instant as before.
+ */
+const PAGES = {
+  today: () => import("@/pages/Today"),
+  transactions: () => import("@/pages/Transactions"),
+  budget: () => import("@/pages/Budget"),
+  accounts: () => import("@/pages/Accounts"),
+  categories: () => import("@/pages/Categories"),
+  splitBill: () => import("@/pages/SplitBill"),
+  analytics: () => import("@/pages/Analytics"),
+  reports: () => import("@/pages/Reports"),
+  portfolio: () => import("@/pages/Portfolio"),
+  insights: () => import("@/pages/Insights"),
+  settings: () => import("@/pages/Settings"),
+};
+const Today = lazy(PAGES.today);
+const Transactions = lazy(PAGES.transactions);
+const Budget = lazy(PAGES.budget);
+const Accounts = lazy(PAGES.accounts);
+const Categories = lazy(PAGES.categories);
+const SplitBill = lazy(PAGES.splitBill);
+const Analytics = lazy(PAGES.analytics);
+const Reports = lazy(PAGES.reports);
+const Portfolio = lazy(PAGES.portfolio);
+const Insights = lazy(PAGES.insights);
+const SettingsPage = lazy(PAGES.settings);
+
+/**
+ * The tab title, page language and search signals follow the page. Only "/"
+ * is offered to search engines: every other page is the user's own data and
+ * empty for a crawler, so it's marked noindex.
+ */
+function useDocumentMeta(pathname, current, t, locale) {
+  useEffect(() => {
+    const home = "Penny · Catat Keuangan, Anggaran & Tabungan";
+    document.title = current && pathname !== "/" ? `${t(current.labelKey)} · Penny` : home;
+    document.documentElement.lang = locale || "id";
+    document.querySelector('meta[name="robots"]')
+      ?.setAttribute("content", pathname === "/" ? "index,follow" : "noindex,follow");
+    document.querySelector('link[rel="canonical"]')
+      ?.setAttribute("href", `https://mypenny.id${pathname}`);
+  }, [pathname, current, t, locale]);
+}
+
+/** Warms every page's chunk after the first paint, one at a time. */
+function usePrefetchPages() {
+  useEffect(() => {
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1200));
+    const cancel = window.cancelIdleCallback || clearTimeout;
+    let id;
+    const loaders = Object.values(PAGES);
+    const next = () => {
+      const load = loaders.shift();
+      if (!load) return;
+      load().catch(() => {}).finally(() => { id = idle(next); });
+    };
+    id = idle(next);
+    return () => cancel(id);
+  }, []);
+}
 
 /**
  * Publishes an element's rendered height as a CSS variable on <html>, so a
@@ -155,6 +206,7 @@ function SidebarBrand({ onEditName, onNavigate }) {
 
 /** A signature, not interface copy — it reads the same in every language. */
 function SidebarFooter() {
+  const t = useT();
   return (
     <div className="mt-auto p-4">
       <div className="rounded-[14px] bg-[var(--primary-soft)] px-3.5 py-3 text-center">
@@ -170,6 +222,15 @@ function SidebarFooter() {
           ryanderon
         </a>
       </div>
+      {/* Static page in public/; Google's consent screen links to it too. */}
+      <a
+        href="/privacy.html"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 block text-center text-[11px] text-muted-foreground hover:text-foreground"
+      >
+        {t("app.privacy")}
+      </a>
     </div>
   );
 }
@@ -449,11 +510,14 @@ function PageTransition({ children }) {
 
 function AppShell() {
   const t = useT();
+  usePrefetchPages();
   const { pathname } = useLocation();
   const [editNameOpen, setEditNameOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const current = NAV_ITEMS.find((i) => i.to === pathname);
+  const locale = useStore((s) => s.locale);
+  useDocumentMeta(pathname, current, t, locale);
   const headerRef = useHeightVar("--app-header-h");
 
   return (
@@ -530,11 +594,11 @@ function HydrationGate({ children }) {
 
   if (!hasHydrated) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Logo size={48} />
-          <Icon name="progress_activity" size={18} className="animate-spin text-muted-foreground" />
-        </div>
+      // Same layout as the static splash in index.html, so nothing jumps.
+      <div className="flex min-h-screen flex-col items-center justify-center gap-2.5 bg-background p-6 text-center">
+        <Logo size={48} />
+        <h1 className="mt-1.5 text-lg font-extrabold tracking-[-0.02em]">Penny</h1>
+        <Icon name="progress_activity" size={18} className="animate-spin text-muted-foreground" />
       </div>
     );
   }

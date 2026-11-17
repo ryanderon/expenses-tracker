@@ -35,7 +35,7 @@ Penny is a single-user budgeting PWA, built for someone in Indonesia (IDR, Bahas
 | Move-or-delete dialog for deleting an account or category, and for fixing orphans | `src/components/ReassignDialog.jsx` |
 | Report period (month or range, or year) | `src/hooks/useReportPeriod.js` + `ReportPeriodControls` in `src/components/ui/date-fields.jsx` |
 | Guided tour | `src/components/Tour.jsx` (`TOUR_STEPS`) |
-| Persisted store | `src/store/useStore.js` (persist name `penny-storage`, **version 9**) |
+| Persisted store | `src/store/useStore.js` (persist name `penny-storage`, **version 10**) |
 | AI chat session store (not persisted) | `src/store/useChatStore.js` |
 | Money and date helpers | `src/lib/utils.js` (`calculateTotals`, `getAccountBalance`, `getReceivables`, cycle helpers, `formatCurrency`) |
 | Categories | `src/lib/constants.js` (`CATEGORIES`, `CATEGORY_TYPES`, `isNeutralType`, `isOutflowType`, `isReceivableReturn`, `getSubcategories`) |
@@ -118,7 +118,10 @@ Transactions are `{ id, createdAt, category, subcategory, account, amount (alway
 
 ## AI Insights (Insights page, "Tanya AI" tab)
 
-- **Providers** (`lib/aiModels.js`): Gemini and Groq (free tiers), and Claude `claude-haiku-5-5` / `claude-sonnet-5-5`.
+- **Providers** (`lib/aiModels.js`), checked against the providers' docs on 2026-11-17:
+  - Gemini (free tier): `gemini-3.8-flash` (default), `gemini-4-hydrogen` (the only free Gemini 4), `gemini-3.5-flash-lite`.
+  - Groq (free tier): `openai/gpt-oss-120b` and `openai/gpt-oss-20b`. Groq shut its Llama models down for free and developer accounts on 16 Aug 2026. The key check reads `/models` (ids contain a slash).
+  - Claude: `claude-haiku-5-5` / `claude-sonnet-5-5`.
   - The user brings their own key, stored in `aiSettings.apiKeys` and never backed up.
   - Effort defaults to `DEFAULT_EFFORT = 'medium'`.
   - Sonnet 5.5 requests use the beta endpoint with `fallbacks: 'default'` (`server-side-fallback-2026-07-01`). Haiku 5.5 has no fallback.
@@ -188,6 +191,23 @@ The user asked for animation everywhere, with shared layouts. The rules:
 - **Reduced motion:** `MotionConfig reducedMotion="user"` keeps fades and drops movement. `index.css` zeroes tw-animate's translate and scale vars with `!important`.
 - **Bundle:** Motion adds about 57 kB gzip to the first load. `xlsx` is loaded inside `exportToExcel` on first use, which saves 91 kB. First load is 270 kB gzip vs 304 kB before the motion work (2026-11-17).
 - **Verified on 2026-11-17** at 390px with the user's data. The motion pass passed 34/34 checks, frame-sampled: nav pill, drawer drag, dialog exit, chips, list rows, collapses, tab pill across layouts, chat, tour spotlight, reduced motion, and no React warnings. The audit passed 197/197.
+
+## SEO and load performance
+
+The live site is `https://mypenny.id`, and the user wants it searchable and fast.
+- **`index.html`:**
+  - Indonesian title and description, canonical, Open Graph and Twitter tags (`public/og-image.png`, 1200×630), and `WebApplication` JSON-LD.
+  - The theme script sits in `<head>`.
+  - `#root` holds a static splash (logo, `h1`, one line). It's the first paint and what crawlers and link previews read; React replaces it. `HydrationGate` copies its layout so nothing jumps.
+- **Per page:** `useDocumentMeta` in `App.jsx` sets the tab title ("Anggaran · Penny"), `<html lang>` from the locale, the canonical, and `robots`. Only `/` is `index`; app pages are the user's own data, so they're `noindex`.
+- **Static files** (served before Vercel's SPA rewrite): `robots.txt`, `sitemap.xml` (`/` and `/privacy.html`), `privacy.html`, `og-image.png`.
+- **Icon font subsetting:** the `subsetIconFont` plugin in `vite.config.js` (build only) adds `&icon_names=` to the Material Symbols URL. The names are every quoted string in `src/` that appears in `scripts/material-symbols-names.txt` (Google's codepoints list). That's 325 KB → 11 KB, and new icons are picked up automatically.
+  - An icon name built at runtime (`` `${x}_icon` ``) wouldn't be found. Keep icon names as literals.
+- **Code splitting:** only the Dashboard is in the first bundle. Every other page is `lazy()` via `PAGES` in `App.jsx`, and `usePrefetchPages` loads them all one by one when the browser is idle. `xlsx` loads inside `exportToExcel`.
+- **Measured 2026-11-17** (390px, 1.6 Mbps / 150 ms, 4× CPU, first visit):
+  - FCP 1876 → 884 ms.
+  - Icons ready 4332 → 2160 ms.
+  - Main JS 140 → 84 kB gzip.
 
 ## Cross-cutting conventions
 

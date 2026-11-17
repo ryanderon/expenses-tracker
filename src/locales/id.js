@@ -59,6 +59,7 @@ export default {
   },
 
   app: {
+    privacy: 'Kebijakan privasi',
     greeting: 'Hai, {name}',
     toggleTheme: 'Ganti tema',
     moreActions: 'Menu lain',
@@ -646,14 +647,15 @@ export default {
     effort: 'Seberapa dalam',
     effortHint: 'Makin dalam makin teliti, tapi token kepakai lebih banyak.',
     pricesTitle: 'Harga saham',
-    pricesBody: 'Cuma perlu buat saham US. Saham IDX dan bursa lain harganya diambil dari Yahoo Finance tanpa key.',
+    pricesBody: 'Pakai API key Twelve Data biar harga semua saham bisa muncul, termasuk saham US dan bursa lain. Tanpa key, saham IDX dan beberapa bursa lain (London, Singapura, Jepang, dll.) tetap jalan lewat Yahoo Finance.',
     pricesKey: 'API key Twelve Data',
     pricesGetKey: 'Ambil API key gratis di Twelve Data',
     pricesBudget: 'Update otomatis maksimal {perDay}x sehari, minimal 6 jam sekali. Tombol update manual bebas kapan aja.',
     modelGeminiFlash: 'Gratis, dan paling pinter di antara yang gratis',
     modelGeminiLite: 'Gratis, lebih cepet, jatah hariannya lebih longgar',
-    modelLlama70: 'Gratis dan cepet banget. Data yang gede bisa kena limit per menit',
-    modelLlama8: 'Gratis dan paling cepet, tapi analisanya lebih dangkal. Paling pas buat satu bulan',
+    modelGemini4: 'Gratis, generasi terbaru (Gemini 4)',
+    modelGptOss120: 'Gratis dan cepet banget. Data yang gede bisa kena limit per menit',
+    modelGptOss20: 'Gratis dan paling cepet, tapi analisanya lebih dangkal. Paling pas buat satu bulan',
     modelSonnet: 'Lebih tajam buat pertanyaan terbuka, harganya sekitar 20× Haiku',
     modelHaiku: 'Cepet dan murah banget, udah cukup buat nanya soal angka-angkamu',
     effortLow: 'Sedikit — paling cepet dan murah',
@@ -662,9 +664,9 @@ export default {
 
     backupTitle: 'Backup Google Drive',
     backupBody:
-      'Satu file backup di folder khusus Penny di Drive kamu — ditimpa tiap kali nyimpen, jadi nggak numpuk.',
+      'Satu file backup di folder tersembunyi khusus Penny di Drive kamu — ditimpa tiap kali nyimpen, jadi nggak numpuk.',
     backupScope:
-      'Penny cuma bisa lihat foldernya sendiri. Isi Drive kamu yang lain aman.',
+      'Folder ini nggak muncul di daftar file Drive. Buat ngecek, buka drive.google.com → Setelan → Kelola aplikasi → Penny. Penny cuma bisa lihat foldernya sendiri, isi Drive kamu yang lain aman.',
     connect: 'Sambungin Google Drive',
     connected: 'Nyambung',
     disconnect: 'Putusin',

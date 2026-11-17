@@ -1,7 +1,7 @@
 # Data model (`src/store/useStore.js`)
 
 - **Persistence:** zustand `persist`, name `penny-storage`, storage `createJSONStorage(() => idbStorage)`. There is no `partialize`, so every non-function key is persisted.
-- **Version:** **9**.
+- **Version:** **10**.
 - **Storage layer** (`src/lib/idbStorage.js`): IndexedDB database `penny`, store `kv`. On first read it adopts legacy `localStorage['penny-storage']`, and it falls back to localStorage if IndexedDB fails.
 
 ## User data
@@ -59,7 +59,7 @@ Google Drive sync (`useGoogleBackup`):
 | Branch | What it does |
 |---|---|
 | `< 9` | Strips computed `balance` / `txCount` from stored accounts (`cleanAccount`). |
-| `< 8` | Maps retired Claude model ids to their successors via `RETIRED_MODELS` (`claude-haiku-4-5` → `claude-haiku-5-5`, `claude-sonnet-5` → `claude-sonnet-5-5`). |
+| `< 10` | Maps retired model ids to their successors via `RETIRED_MODELS`: `claude-haiku-4-5` → `claude-haiku-5-5` and `claude-sonnet-5` → `claude-sonnet-5-5` (added at v8), plus `llama-3.3-70b-versatile` → `openai/gpt-oss-120b` and `llama-3.1-8b-instant` → `openai/gpt-oss-20b` (v10). |
 | `< 5` | Adds holdings, priceCache, priceRates and priceMeta. |
 | `< 6` | Resets a model that isn't in `AI_MODELS` to `DEFAULT_MODEL`. |
 | `< 4` | Defaults subBudgets, budgetTemplate, budgetSettings, aiSettings, syncSettings and dataUpdatedAt. |

@@ -21,7 +21,7 @@ export const AI_PROVIDERS = [
   },
   {
     id: 'groq',
-    label: 'Groq (Llama)',
+    label: 'Groq (GPT-OSS)',
     free: true,
     keyPlaceholder: 'gsk_...',
     keyUrl: 'https://console.groq.com/keys',
@@ -64,6 +64,17 @@ export const AI_MODELS = [
     maxTransactions: 600,
   },
   {
+    // Newest generation, and the only Gemini 4 model on the free tier
+    // (Carbon and Argon are paid only).
+    id: 'gemini-4-hydrogen',
+    provider: 'google',
+    label: 'Gemini 4 Hydrogen',
+    shortLabel: 'Gemini 4',
+    hintKey: 'settings.modelGemini4',
+    maxTokens: 8192,
+    maxTransactions: 600,
+  },
+  {
     id: 'gemini-3.5-flash-lite',
     provider: 'google',
     label: 'Gemini 3.5 Flash-Lite',
@@ -72,22 +83,26 @@ export const AI_MODELS = [
     maxTokens: 8192,
     maxTransactions: 400,
   },
+  // Groq shut its Llama models down for free and developer accounts on
+  // 16 Aug 2026; these are its recommended replacements. They reason before
+  // answering, and that reasoning counts against `maxTokens`, so the 20B
+  // gets the same cap as the 120B instead of the old 2048.
   {
-    id: 'llama-3.3-70b-versatile',
+    id: 'openai/gpt-oss-120b',
     provider: 'groq',
-    label: 'Llama 3.3 70B',
-    shortLabel: 'Llama 70B',
-    hintKey: 'settings.modelLlama70',
+    label: 'GPT-OSS 120B',
+    shortLabel: 'GPT-OSS 120B',
+    hintKey: 'settings.modelGptOss120',
     maxTokens: 4096,
-    maxTransactions: 120,
+    maxTransactions: 100,
   },
   {
-    id: 'llama-3.1-8b-instant',
+    id: 'openai/gpt-oss-20b',
     provider: 'groq',
-    label: 'Llama 3.1 8B',
-    shortLabel: 'Llama 8B',
-    hintKey: 'settings.modelLlama8',
-    maxTokens: 2048,
+    label: 'GPT-OSS 20B',
+    shortLabel: 'GPT-OSS 20B',
+    hintKey: 'settings.modelGptOss20',
+    maxTokens: 4096,
     maxTransactions: 30,
   },
   {
@@ -119,10 +134,12 @@ export const AI_MODELS = [
 
 export const DEFAULT_MODEL = AI_MODELS[0].id;
 
-/** Claude ids retired from the list, and what a saved setting moves to. */
+/** Ids retired from the list, and what a saved setting moves to. */
 export const RETIRED_MODELS = {
   'claude-haiku-4-5': 'claude-haiku-5-5',
   'claude-sonnet-5': 'claude-sonnet-5-5',
+  'llama-3.3-70b-versatile': 'openai/gpt-oss-120b',
+  'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
 };
 
 /**

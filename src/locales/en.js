@@ -57,6 +57,7 @@ export default {
   },
 
   app: {
+    privacy: 'Privacy policy',
     greeting: 'Hi, {name}',
     toggleTheme: 'Toggle theme',
     moreActions: 'More actions',
@@ -644,14 +645,15 @@ export default {
     effort: 'How deep to think',
     effortHint: 'Deeper means more thorough, but it burns more tokens.',
     pricesTitle: 'Stock prices',
-    pricesBody: 'Only needed for US stocks. IDX and other markets are priced from Yahoo Finance without a key.',
+    pricesBody: 'Add a Twelve Data API key to get prices for every stock, including US and other markets. Without one, IDX and several other markets (London, Singapore, Japan and more) still work through Yahoo Finance.',
     pricesKey: 'Twelve Data API key',
     pricesGetKey: 'Get a free API key from Twelve Data',
     pricesBudget: 'Auto-updates at most {perDay}x a day, at least 6 hours apart. Manual refresh is always allowed.',
     modelGeminiFlash: 'Free, and the strongest of the free options',
     modelGeminiLite: 'Free, faster, with a more generous daily limit',
-    modelLlama70: 'Free and very fast. Big snapshots can hit the per-minute limit',
-    modelLlama8: 'Free and the fastest, but shallower. Best for a single month',
+    modelGemini4: 'Free, newest generation (Gemini 4)',
+    modelGptOss120: 'Free and very fast. Big snapshots can hit the per-minute limit',
+    modelGptOss20: 'Free and the fastest, but shallower. Best for a single month',
     modelSonnet: 'Sharper on open-ended questions, at about 20× Haiku’s price',
     modelHaiku: 'Fast and very cheap, plenty for questions about your own numbers',
     effortLow: 'Light — fastest and cheapest',
@@ -660,9 +662,9 @@ export default {
 
     backupTitle: 'Google Drive backup',
     backupBody:
-      "One backup file in Penny's own folder on your Drive — overwritten each save, never piling up.",
+      "One backup file in a hidden folder of Penny's own on your Drive — overwritten each save, never piling up.",
     backupScope:
-      'Penny only ever sees its own folder. The rest of your Drive stays private.',
+      "The folder doesn't show in your Drive's file list. To check it, open drive.google.com → Settings → Manage apps → Penny. Penny only ever sees its own folder; the rest of your Drive stays private.",
     connect: 'Hook up Google Drive',
     connected: 'Connected',
     disconnect: 'Unlink',

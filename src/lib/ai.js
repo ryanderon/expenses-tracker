@@ -333,7 +333,11 @@ export async function verifyApiKey(provider, apiKey) {
   if (provider === 'google') {
     await request(`${GEMINI_BASE}/models/${model}`, { headers: { 'x-goog-api-key': apiKey } });
   } else if (provider === 'groq') {
-    await request(`${GROQ_BASE}/models/${model}`, { headers: { Authorization: `Bearer ${apiKey}` } });
+    // Groq's ids contain a slash (`openai/gpt-oss-120b`), so look the model up
+    // in the list rather than at /models/{id}.
+    const res = await request(`${GROQ_BASE}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
+    const { data = [] } = await res.json();
+    if (!data.some((m) => m.id === model)) throw new Error('insights.errNotFound');
   } else {
     try {
       const client = await createAnthropicClient(apiKey);

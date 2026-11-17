@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import {
   Panel, PanelTitle, StackedBar, LegendRow, Meter,
 } from '@/components/ui/design';
@@ -17,6 +17,17 @@ import {
 /** Grouped vertical bars — the design's "Monthly Comparison" panel. */
 function ComparisonBars({ months, t }) {
   const max = Math.max(...months.flatMap((m) => [m.income, m.expenses, m.savings]), 1);
+  const scroller = useRef(null);
+  const latest = months.reduce((at, m, i) => (m.income || m.expenses || m.savings ? i : at), months.length - 1);
+
+  // Start scrolled so the latest month with data sits at the right edge.
+  // scrollLeft, not scrollIntoView: that would scroll the page too.
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const target = el?.querySelector('[data-latest]');
+    if (!el || !target || el.scrollWidth <= el.clientWidth) return;
+    el.scrollLeft = target.offsetLeft + target.offsetWidth - el.clientWidth + 12;
+  }, [latest, months.length]);
   const series = [
     { key: 'income', color: 'var(--chart-1)', label: t('transactions.income') },
     { key: 'expenses', color: 'var(--chart-2)', label: t('transactions.expenses') },
@@ -25,9 +36,16 @@ function ComparisonBars({ months, t }) {
 
   return (
     <>
-      <div className="flex h-[150px] items-end gap-3 px-2 sm:gap-5">
-        {months.map((m) => (
-          <div key={m.label} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
+      {/* A year of grouped bars needs ~560px. On a phone it scrolls inside the
+          card (opening on the latest month with data) instead of spilling out. */}
+      <div ref={scroller} className="-mx-1 overflow-x-auto overscroll-x-contain pb-1">
+        <div className="flex h-[150px] w-full min-w-max items-end gap-3 px-3 sm:gap-5">
+          {months.map((m, i) => (
+          <div
+            key={m.label}
+            data-latest={i === latest || undefined}
+            className="flex h-full min-w-9 flex-1 flex-col items-center justify-end gap-1.5"
+          >
             <div className="flex h-full items-end gap-[3px]">
               {series.map((s) => (
                 <div
@@ -44,7 +62,8 @@ function ComparisonBars({ months, t }) {
             </div>
             <span className="text-[11px] text-muted-foreground">{m.label}</span>
           </div>
-        ))}
+          ))}
+        </div>
       </div>
       <div className="mt-3.5 flex flex-wrap gap-4 text-[11.5px] text-muted-foreground">
         {series.map((s) => (
@@ -220,7 +239,9 @@ export default function Analytics() {
             )}
           </Panel>
 
-          <Panel className="xl:col-span-2">
+          {/* min-w-0: a grid item otherwise widens to fit the chart and spills
+              off a phone screen, instead of letting the chart scroll inside. */}
+          <Panel className="min-w-0 xl:col-span-2">
             <PanelTitle>{t('analytics.monthlyComparison')}</PanelTitle>
             {comparison.length > 0 ? (
               <ComparisonBars months={comparison} t={t} />

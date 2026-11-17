@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Penny",
   "short_name": "Penny",
-  "description": "Personal finance tracker for managing income, expenses, savings, and investments",
+  "description": "Catat pemasukan, pengeluaran, anggaran, tabungan, dan investasi. Datanya tetap di HP kamu.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7f8fa",
@@ -39,5 +39,10 @@
       "type": "image/svg+xml",
       "purpose": "maskable"
     }
+  ],
+  "lang": "id",
+  "categories": [
+    "finance",
+    "productivity"
   ]
 }

@@ -647,7 +647,7 @@ const useStore = create(
     },
     {
       name: 'penny-storage',
-      version: 9,
+      version: 10,
       storage: createJSONStorage(() => idbStorage),
 
       migrate: (persisted, version) => {
@@ -656,10 +656,11 @@ const useStore = create(
         if (version < 9) {
           next.accounts = (next.accounts || []).map(cleanAccount);
         }
-        if (version < 8) {
-          // Claude Haiku 4.5 and Sonnet 5 left the list for their 5.5
-          // successors. Same key, same provider: carry the choice forward
-          // rather than letting the check below drop it to the free default.
+        if (version < 10) {
+          // Retired models (Claude Haiku 4.5 and Sonnet 5 at v8, Groq's Llama
+          // models at v10) map to their successors. Same key, same provider:
+          // carry the choice forward rather than letting the check below drop
+          // it to the free default.
           const model = next.aiSettings?.model;
           if (RETIRED_MODELS[model]) {
             next.aiSettings = { ...next.aiSettings, model: RETIRED_MODELS[model] };

@@ -77,7 +77,7 @@ If no budget is set, the screen says so and points at the Budget page rather tha
 
 ## AI Insights
 
-Bring your own API key — add it in **Settings**. Google AI Studio (Gemini) and Groq (Llama) have free tiers; Anthropic (Claude Haiku 5.5 and Claude Sonnet 5.5) is paid. Requests go straight from your browser to the provider; keys are stored only on your device and are deliberately excluded from every backup and export.
+Bring your own API key — add it in **Settings**. Google AI Studio (Gemini 3.8 Flash, Gemini 4 Hydrogen, Gemini 3.5 Flash-Lite) and Groq (GPT-OSS 120B and 20B) have free tiers; Anthropic (Claude Haiku 5.5 and Claude Sonnet 5.5) is paid. Requests go straight from your browser to the provider; keys are stored only on your device and are deliberately excluded from every backup and export.
 
 The first question in a chat carries a JSON snapshot: monthly trend, category and subcategory breakdowns, budget vs actual, pacing, daily spending, account balances, detected recurring commitments, and the period's transactions one compact line each (capped per model, keeping the largest when a month is busier than the cap). Follow-ups reuse it, and on Claude it is prompt-cached.
 
@@ -113,7 +113,9 @@ Optional, and off until you connect it. Penny requests only the `drive.appdata` 
 
 Backups are debounced ~20s after your last edit and flushed when the tab is hidden. On first connect, if Drive already holds a newer copy you're asked which side to keep rather than having one silently overwrite the other.
 
-Set up requires a Google OAuth client ID (Web application) from the Google Cloud Console, with your app's origin listed under authorised JavaScript origins:
+Set up requires a Google OAuth client ID (Web application) from the Google Cloud Console, with your app's origin listed under authorised JavaScript origins. Turn on the Google Drive API, and add only the `drive.appdata` scope on the consent screen.
+
+To get rid of the "Google hasn't verified this app" screen, publish the OAuth app (**Audience → Publish app**). Google only enables that button once **Branding** has an app name, support email, home page and **privacy policy link**. Use `https://<your-domain>/privacy.html`, which ships from `public/privacy.html`. `drive.appdata` is a non-sensitive scope, so publishing needs no verification review.
 
 ```bash
 # .env.local
@@ -142,6 +144,7 @@ Tone across both languages is casual and everyday — short sentences, contracti
 - `@anthropic-ai/sdk` for Insights (lazy-loaded)
 - Yahoo (via the `api/quote.js` proxy) and Twelve Data REST for stock prices (no SDK, plain `fetch`)
 - date-fns, xlsx (loaded on the first Excel export, not with the app)
+- Only the Dashboard ships in the first bundle; other pages load on demand and are prefetched when the browser is idle. The build trims the Material Symbols font to the icons the code uses (`subsetIconFont` in `vite.config.js`).
 - i18n is hand-rolled — see `src/lib/i18n.js`
 
 ## Getting started

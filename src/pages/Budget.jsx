@@ -28,7 +28,7 @@ import { getAllCategories, isNeutralType } from '@/lib/constants';
 import { formatCurrency, getMonthKey, cn } from '@/lib/utils';
 import { useT } from '@/hooks/useT';
 import { usePeriodLabel } from '@/hooks/useCycle';
-import { StatCard, SegmentedTabs, Icon } from '@/components/ui/design';
+import { SegmentedTabs, Icon, IconBadge } from '@/components/ui/design';
 import { categoryLabel, subcategoryLabel } from '@/lib/i18n';
 import { buildBudgetReport, shiftMonth } from '@/lib/budget';
 import PageHeader from '@/components/PageHeader';
@@ -367,6 +367,27 @@ function TemplateTab({ report }) {
 }
 
 /** One sentence per alert, chosen by severity. */
+const PACE_ROW = 'flex items-baseline justify-between gap-3 sm:block';
+
+/**
+ * One figure in the Budget summary panel. Label on top, value full width
+ * below, so a phone-width cell fits a full "Rp 23.271.650".
+ */
+function SummaryCell({ icon, tone, label, value, valueClass, sub }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 bg-card p-4">
+      <div className="flex items-center gap-2 text-[12px] font-medium leading-tight text-muted-foreground">
+        <IconBadge name={icon} tone={tone} size={22} className="rounded-md" />
+        <span className="min-w-0">{label}</span>
+      </div>
+      <p className={cn('text-[16px] font-extrabold leading-tight tracking-[-0.01em] sm:text-[18px]', valueClass)}>
+        <AnimatedNumber value={value} format={formatCurrency} />
+      </p>
+      {sub && <div className="flex flex-col gap-0.5 text-[11px] leading-snug text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
+
 function alertLine(cat, t) {
   const label = categoryLabel(cat, t);
   if (cat.isOver) {
@@ -614,39 +635,45 @@ export default function Budget() {
           </div>
 
           {/* Alerts: spending only. Savings and investment targets never warn. */}
+          {/* A compact banner: red once a limit is passed, amber while it's only close. */}
           {report.alerts.length > 0 && (
-            <Card className="border-chart-2/50 bg-chart-2/5">
-              <CardContent className="pt-4 pb-4 flex flex-col gap-1.5">
-                {report.alerts.slice(0, 4).map((cat) => (
-                  <p key={cat.key} className="text-sm flex items-start gap-2">
-                    <CircleAlert className={cn(
-                      'size-4 mt-0.5 shrink-0',
-                      cat.isOver ? 'text-destructive' : 'text-chart-2'
-                    )} />
-                    <span>
-                      {alertLine(cat, t)}
-                    </span>
-                  </p>
-                ))}
-              </CardContent>
-            </Card>
+            <div className={cn(
+              'flex flex-col gap-1.5 rounded-2xl px-3.5 py-3 text-[13px] leading-snug',
+              report.alerts.some((c) => c.isOver) ? 'bg-danger-soft' : 'bg-amber-soft'
+            )}>
+              {report.alerts.slice(0, 4).map((cat) => (
+                <p key={cat.key} className="flex items-start gap-2">
+                  <CircleAlert className={cn(
+                    'mt-px size-4 shrink-0',
+                    cat.isOver ? 'text-danger' : 'text-amber'
+                  )} />
+                  <span>{alertLine(cat, t)}</span>
+                </p>
+              ))}
+            </div>
           )}
 
           {/* Summary */}
-          <div data-tour="budget-summary" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              label={t('budget.income')}
-              value={<AnimatedNumber value={report.income} format={formatCurrency} />}
+          {/* One panel split into cells, not four cards: on a phone a card with
+              an icon beside the value left room for "Rp 23.2…" only. */}
+          <div
+            data-tour="budget-summary"
+            className="grid grid-cols-2 gap-px overflow-hidden rounded-[20px] border border-border bg-border shadow-[var(--shadow-card)] lg:grid-cols-4"
+          >
+            <SummaryCell
               icon="trending_up"
               tone="primary"
+              label={t('budget.income')}
+              value={report.income}
               valueClass="text-primary"
             />
-            <StatCard
-              label={t('budget.spendLimit')}
-              value={<AnimatedNumber value={spending.budget} format={formatCurrency} />}
+            <SummaryCell
               icon="track_changes"
-              sub={
-                <div className="flex flex-col gap-0.5">
+              tone="primary"
+              label={t('budget.spendLimit')}
+              value={spending.budget}
+              sub={(
+                <>
                   {report.income > 0 && spending.budget > 0 && (
                     <span>{t('budget.pctOfIncome', { percent: Math.round((spending.budget / report.income) * 100) })}</span>
                   )}
@@ -655,24 +682,24 @@ export default function Budget() {
                       {t('budget.rolloverAmount', { amount: formatCurrency(report.totalRollover) })}
                     </span>
                   )}
-                </div>
-              }
+                </>
+              )}
             />
-            <StatCard
-              label={t('transactions.expenses')}
-              value={<AnimatedNumber value={spending.spent} format={formatCurrency} />}
+            <SummaryCell
               icon="trending_down"
               tone={spending.isOver ? 'danger' : 'muted'}
+              label={t('transactions.expenses')}
+              value={spending.spent}
               valueClass={spending.isOver ? 'text-danger' : undefined}
             />
-            <StatCard
-              label={t('budget.unallocated')}
-              value={<AnimatedNumber value={report.unallocated} format={formatCurrency} />}
+            <SummaryCell
               icon="account_balance_wallet"
               tone={report.unallocated < 0 ? 'danger' : 'muted'}
+              label={t('budget.unallocated')}
+              value={report.unallocated}
               valueClass={report.unallocated < 0 ? 'text-danger' : undefined}
               sub={report.unallocated < 0 && (
-                <span className="text-destructive flex items-center gap-1">
+                <span className="flex items-center gap-1 text-destructive">
                   <AlertTriangle className="size-2.5" /> {t('budget.overAllocated')}
                 </span>
               )}
@@ -682,8 +709,8 @@ export default function Budget() {
           {/* Spending against its limits. Targets have their own section below. */}
           <Card>
             <CardContent className="pt-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                <div>
+              <div className="mb-4 flex items-end justify-between gap-3">
+                <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <Target className="text-chart-1" />
                     <h3 className="text-sm font-semibold">{t('budget.spendingTitle')}</h3>
@@ -691,7 +718,8 @@ export default function Budget() {
                   <p className="text-2xl font-bold">
                     <AnimatedNumber value={spending.spent} format={formatCurrency} />{' '}
                     {spending.budget > 0 && (
-                      <span className="text-sm font-normal text-muted-foreground">
+                      // Its own line, so "dari" never dangles after a long amount.
+                      <span className="mt-0.5 block text-sm font-normal text-muted-foreground">
                         {t('common.of')} {formatCurrency(spending.budget)}
                       </span>
                     )}
@@ -721,10 +749,11 @@ export default function Budget() {
               )}
 
               {spending.pacing.isCurrent && spending.budget > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-border">
-                  <div>
+                // Label left, value right on a phone; three columns from sm up.
+                <div className="mt-4 grid grid-cols-1 gap-2.5 border-t border-border pt-4 sm:grid-cols-3 sm:gap-3">
+                  <div className={PACE_ROW}>
                     <p className="text-xs text-muted-foreground">{t('budget.expectedToday')}</p>
-                    <p className="text-sm font-semibold tabular-nums">
+                    <p className="text-right text-sm font-semibold tabular-nums sm:text-left">
                       {spending.pacing.elapsedPct}%
                       <span className={cn(
                         'ml-1.5 text-xs font-normal',
@@ -734,21 +763,21 @@ export default function Budget() {
                       </span>
                     </p>
                   </div>
-                  <div>
+                  <div className={PACE_ROW}>
                     <p className="text-xs text-muted-foreground">{t('budget.projectedEnd')}</p>
                     <p className={cn(
-                      'text-sm font-semibold tabular-nums',
+                      'text-right text-sm font-semibold tabular-nums sm:text-left',
                       spending.pacing.projectedOver && 'text-destructive'
                     )}>
                       {formatCurrency(spending.pacing.projected)}
                     </p>
                   </div>
-                  <div>
+                  <div className={PACE_ROW}>
                     {/* Over the limit there's nothing "safe" left to spend: say by how much instead. */}
                     {spending.isOver ? (
                       <>
                         <p className="text-xs text-muted-foreground">{t('budget.overBudget')}</p>
-                        <p className="text-sm font-semibold tabular-nums text-destructive">
+                        <p className="text-right text-sm font-semibold tabular-nums text-destructive sm:text-left">
                           {t('budget.overBy', { amount: formatCurrency(-spending.remaining) })}
                         </p>
                       </>
@@ -757,7 +786,7 @@ export default function Budget() {
                         <p className="text-xs text-muted-foreground">
                           {t('budget.safeToSpend')} · {t('budget.daysLeftShort', { count: spending.pacing.daysLeft })}
                         </p>
-                        <p className="text-sm font-semibold tabular-nums text-chart-1">
+                        <p className="text-right text-sm font-semibold tabular-nums text-chart-1 sm:text-left">
                           {formatCurrency(spending.pacing.dailySafe)}{t('common.perDay')}
                         </p>
                       </>

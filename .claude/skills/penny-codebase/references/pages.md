@@ -54,6 +54,7 @@ Routes live in `src/App.jsx`. Analytics, Reports, Portfolio, Insights and Settin
   - Yearly: the cycle-aware year.
 - **Panels:** distribution of outflow categories (income and neutral types excluded), top 6 expense subcategories (`topSubcategoryRows`), `ComparisonBars` (each period of `chartYear`), category mix, and quick stats (the average is per expense, not per transaction).
 - **Category mix:** Bills is its own row; Expenses is `totals.expenses − bills`.
+- **`ComparisonBars` on a phone:** a year of groups (~36px each) is wider than the card, so it scrolls sideways inside it and opens on the latest month with data. The Panel needs `min-w-0`: a grid item otherwise widens to fit the chart and spills off the screen, which a page-level `scrollWidth` check doesn't catch.
 
 ## `/budget` Budget (`src/pages/Budget.jsx`)
 
@@ -62,7 +63,9 @@ Routes live in `src/App.jsx`. Analytics, Reports, Portfolio, Insights and Settin
   - The main card is spending vs limits (`report.spending`).
   - Two sections: "Batas pengeluaran" (limit cards) and "Target nyisihin" (goal cards for Savings/Investments: collected vs target, "Tercapai", no pace marker and no projection).
   - With no limits set, the usage panel shows `budget.noBudgetHint` instead of "of Rp 0 · 0%".
-  - Alerts (limits only), then the stats: Masuk, Batas pengeluaran, Pengeluaran, Belum dianggarkan.
+  - Alerts (limits only) are a compact banner: red if any limit is passed, amber while they're only close.
+  - The stats (Masuk, Batas pengeluaran, Pengeluaran, Belum dianggarkan) are one panel of `SummaryCell`s split by hairlines: 2×2 on a phone, 1×4 from `lg`. Label on top and the value full width below. Four `StatCard`s side by side cut the values off at phone width ("Rp 23.2…").
+  - Spending card: the amount and the percent share a row, with "dari Rp …" on its own line. Below it, the pace figures are label-and-value rows on a phone and three columns from `sm`.
   - A `CategoryCard` per category with category and subcategory overrides (`BudgetAmountInput` commits on blur or Enter).
 - **Recurring tab ("Tiap periode"):** `TemplateTab` edits `budgetTemplate`.
 - **Manage categories dialog:** adds or removes `customSubcategories`.
@@ -112,7 +115,7 @@ Sections, in order:
 - **Language.**
 - **Cycle:** presets 1, 20, 25 or 28, or a custom day from 1 to 28, plus the "Mulai periode pas gaji masuk" toggle (`cycleFollowPaycheck`).
 - **AI:** provider, key with a verify button, model, and effort for Claude.
-- **Prices:** Twelve Data key.
+- **Prices:** Twelve Data key (`PricesSection`). Its selling point is coverage: with a key every stock gets a price; without one, only exchanges in `YAHOO_SUFFIXES` (IDX, LSE, SGX, JPX…) do, through the Yahoo proxy.
 - **Google Drive backup:** includes the `ConflictDialog`.
 - **Data:** name, counts, storage size, JSON export and import, Excel export.
 
@@ -132,4 +135,5 @@ Sections, in order:
   4. Insights header
   5. Navigation: sidebar on desktop, "Lainnya" on mobile
 - **PWA:** `public/sw.js` (network-first navigation, cache-first assets, skips `/api`) and `public/manifest.json`. The service worker is registered in production only.
+  - `public/privacy.html` is the privacy policy, static so it loads without JS. Google's consent screen requires its URL before the OAuth app can be published, and the sidebar footer links to it. Keep it true when the app starts sending data anywhere new.
   - It also keeps Google Fonts (Manrope and Material Symbols, served from cache and refreshed in the background), so the icons survive opening the app offline. Without that cache they turn into their names and break the layout.

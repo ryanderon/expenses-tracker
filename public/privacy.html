@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kebijakan Privasi · Penny</title>
+  <meta name="description" content="Kebijakan privasi Penny, aplikasi pencatat keuangan pribadi." />
+  <link rel="canonical" href="https://mypenny.id/privacy.html" />
+  <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
+  <style>
+    :root {
+      --bg: #f7f8f7; --fg: #1d2420; --muted: #5d6762; --card: #ffffff; --line: #e3e7e4; --accent: #12824e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1412; --fg: #e9eeeb; --muted: #9aa5a0; --card: #171d1a; --line: #2a322e; --accent: #4fc289; }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    header img { width: 40px; height: 40px; }
+    h1 { font-size: 28px; line-height: 1.2; margin: 0; letter-spacing: -0.02em; }
+    h2 { font-size: 19px; margin: 36px 0 8px; letter-spacing: -0.01em; }
+    p, li { color: var(--fg); }
+    .meta { color: var(--muted); font-size: 14px; margin: 0 0 28px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; margin: 16px 0; }
+    ul { padding-left: 20px; }
+    li { margin: 6px 0; }
+    a { color: var(--accent); }
+    nav.lang { font-size: 14px; color: var(--muted); }
+    hr { border: 0; border-top: 1px solid var(--line); margin: 48px 0; }
+    code { font-size: 14px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="/favicon.svg?v=2" alt="" />
+    <h1>Kebijakan Privasi Penny</h1>
+  </header>
+  <p class="meta">Berlaku sejak 17 November 2026 · <a href="#en">English version below</a></p>
+
+  <div class="card">
+    <strong>Ringkasnya:</strong> semua data keuangan kamu disimpan di perangkat kamu sendiri. Penny tidak punya server untuk menyimpan data kamu, tidak menjual data, dan tidak memakai data kamu untuk iklan.
+  </div>
+
+  <h2>Data yang disimpan</h2>
+  <p>Transaksi, akun, kategori, anggaran, portofolio, dan pengaturan disimpan di browser perangkat kamu (IndexedDB). Data ini tidak dikirim ke server Penny, karena Penny memang tidak punya server penyimpanan. Menghapus data situs di browser akan menghapus data ini, kecuali kamu sudah membuat backup.</p>
+
+  <h2>Backup Google Drive (opsional)</h2>
+  <ul>
+    <li>Kalau kamu menyambungkan Google Drive, Penny meminta satu izin saja: <code>drive.appdata</code>. Izin ini hanya membuka folder tersembunyi khusus Penny di Drive kamu.</li>
+    <li>Penny tidak bisa melihat, membaca, atau mengubah file lain di Drive kamu.</li>
+    <li>Isi backup berupa satu file berisi data Penny kamu. File itu dikirim langsung dari browser ke Drive kamu, tanpa lewat server lain.</li>
+    <li>Kamu bisa memutus sambungan kapan saja dari Pengaturan, dan menghapus datanya lewat Google Drive → Setelan → Kelola aplikasi → Penny.</li>
+  </ul>
+  <p>Penggunaan dan pemindahan informasi yang diterima dari Google API oleh Penny mematuhi <a href="https://developers.google.com/terms/api-services-user-data-policy">Kebijakan Data Pengguna Layanan Google API</a>, termasuk ketentuan Limited Use.</p>
+
+  <h2>Fitur AI (opsional)</h2>
+  <p>Fitur "Tanya AI" memakai API key milik kamu sendiri dari penyedia yang kamu pilih: Google (Gemini), Groq, atau Anthropic (Claude). Saat kamu bertanya, ringkasan keuangan dari periode yang dipilih dan pertanyaan kamu dikirim langsung dari browser ke penyedia tersebut. Data itu tunduk pada kebijakan privasi penyedia masing-masing. API key hanya disimpan di perangkat kamu dan tidak pernah ikut backup atau export.</p>
+
+  <h2>Harga saham (opsional)</h2>
+  <p>Untuk memperbarui harga saham di portofolio, Penny mengirim kode saham (misalnya <code>BBCA</code>), bukan jumlah atau nilai kepemilikan kamu. Kode saham IDX dan beberapa bursa lain dikirim ke Yahoo Finance lewat proxy Penny. Kode lainnya dikirim ke Twelve Data memakai API key kamu sendiri. Pencarian saham juga lewat Twelve Data.</p>
+
+  <h2>Scan struk</h2>
+  <p>Fitur scan struk di Patungan membaca foto struk langsung di perangkat kamu. Fotonya tidak diunggah. Yang diunduh hanya file pengenal teks yang dibutuhkan.</p>
+
+  <h2>Statistik kunjungan</h2>
+  <p>Penny memakai Vercel Analytics untuk menghitung kunjungan halaman secara anonim, tanpa cookie dan tanpa data keuangan. Font dan ikon dimuat dari Google Fonts.</p>
+
+  <h2>Yang tidak dilakukan Penny</h2>
+  <ul>
+    <li>Tidak menjual atau menyewakan data kamu.</li>
+    <li>Tidak memakai data kamu untuk iklan.</li>
+    <li>Tidak memakai data dari Google API untuk melatih model AI.</li>
+  </ul>
+
+  <h2>Perubahan dan kontak</h2>
+  <p>Kalau kebijakan ini berubah, tanggal di atas akan diperbarui. Pertanyaan bisa disampaikan lewat <a href="https://github.com/ryanderon">github.com/ryanderon</a>.</p>
+
+  <hr />
+
+  <section id="en" lang="en">
+    <h1>Penny Privacy Policy</h1>
+    <p class="meta">Effective 17 November 2026</p>
+
+    <div class="card">
+      <strong>In short:</strong> all your financial data stays on your own device. Penny has no server that stores your data, does not sell data, and does not use your data for advertising.
+    </div>
+
+    <h2>Data stored</h2>
+    <p>Transactions, accounts, categories, budgets, portfolio and settings are stored in your browser on your device (IndexedDB). They are not sent to any Penny server; Penny has no storage server. Clearing the site's data in your browser deletes them unless you have a backup.</p>
+
+    <h2>Google Drive backup (optional)</h2>
+    <ul>
+      <li>If you connect Google Drive, Penny requests a single scope: <code>drive.appdata</code>. It only grants access to a hidden folder in your Drive that belongs to Penny.</li>
+      <li>Penny cannot see, read or change any other file in your Drive.</li>
+      <li>The backup is one file containing your Penny data, sent directly from your browser to your Drive with no server in between.</li>
+      <li>You can disconnect at any time in Settings, and delete the data in Google Drive → Settings → Manage apps → Penny.</li>
+    </ul>
+    <p>Penny's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+    <h2>AI features (optional)</h2>
+    <p>"Ask AI" uses your own API key from the provider you choose: Google (Gemini), Groq or Anthropic (Claude). When you ask a question, a summary of your finances for the selected period and your question are sent directly from your browser to that provider, under that provider's privacy policy. API keys are stored only on your device and are never included in backups or exports.</p>
+
+    <h2>Stock prices (optional)</h2>
+    <p>To update portfolio prices, Penny sends ticker symbols (for example <code>BBCA</code>), never your holdings or their value. IDX and several other exchanges are looked up on Yahoo Finance through Penny's proxy. Other tickers go to Twelve Data with your own API key. Symbol search also uses Twelve Data.</p>
+
+    <h2>Receipt scanning</h2>
+    <p>Receipt scanning in Split Bill reads the photo on your device. The photo is not uploaded; only the text-recognition data files are downloaded.</p>
+
+    <h2>Usage statistics</h2>
+    <p>Penny uses Vercel Analytics to count page views anonymously, without cookies and without any financial data. Fonts and icons load from Google Fonts.</p>
+
+    <h2>What Penny does not do</h2>
+    <ul>
+      <li>Sell or rent your data.</li>
+      <li>Use your data for advertising.</li>
+      <li>Use data obtained from Google APIs to train AI models.</li>
+    </ul>
+
+    <h2>Changes and contact</h2>
+    <p>If this policy changes, the date above will be updated. Questions can be raised at <a href="https://github.com/ryanderon">github.com/ryanderon</a>.</p>
+  </section>
+</main>
+</body>
+</html>
